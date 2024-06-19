@@ -864,7 +864,7 @@ class leapctserver:
         #leap_preprocessing_algorithms.detectorDeblur_RichardsonLucy(self.leapct, ...)
         pass
         
-    def ringRemoval_fast(self, delta, numIter, maxChange):
+    def ringRemoval_fast(self, delta=0.01, numIter=30, maxChange=0.05):
         if self.leapct.ct_geometry_defined() == False:
             print('Error: CT geometry not defined!')
             return False
@@ -894,7 +894,7 @@ class leapctserver:
             print('Error: ring removal current only implemented for attenuation data')
             return False
         
-    def ringRemoval(self, delta, beta, numIter):
+    def ringRemoval(self, delta=0.01, beta=1.0e1, numIter=30):
         if self.leapct.ct_geometry_defined() == False:
             print('Error: CT geometry not defined!')
             return False

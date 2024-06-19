@@ -5,7 +5,8 @@ test_ART_save.py
 *.dat
 *.raw
 *.sct
-demo_leaptorch/sample_data/*.png
+demo/sample_data/*.tif
+demo/sample_data/*.txt
 LTT.log
 dictionary_utils.py
 
