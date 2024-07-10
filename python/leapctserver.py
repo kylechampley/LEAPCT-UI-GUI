@@ -108,9 +108,16 @@ class leapctserver:
                 self.max_CPU_memory_usage = min(physicalMemory - 4.0, 0.95*physicalMemory) # reserve 4 GB of memory; this is likely too much
         else:
             self.max_CPU_memory_usage = 128.0
-
+            
+        # Section III: data chunking
+        [self.PROJECTION, self.DETECTOR_ROW, self.Z_SLICE] = [0, 1, 2]
+        self.chunking_type = self.PROJECTION
+        self.num_proj = 0
+        self.num_vol = 0
+        self.scratch_space = 0.0 # extra memory reserved
+        self.chunk_size = 0
         
-        ### Section III: spectra parameters
+        ### Section IV: spectra parameters
         self.reference_energy = -1.0
         self.lowest_energy = -1.0
         self.energy_bin_width = -1.0
@@ -119,6 +126,10 @@ class leapctserver:
         self.anode_material = 74
         self.xray_filters = None
         self.detector_response_model = None
+        
+        self.init_angle = 0.0
+        self.angular_range = 0.0
+        self.num_angles = 0.0
         
     def is_number(self, s):
         if s is None:
@@ -646,6 +657,72 @@ class leapctserver:
     def memory_usage(self):
         return self.memory_used_by_array(self.g) + self.memory_used_by_array(self.f)
         
+        
+    def projection_memory(self):
+        if self.leapct.ct_geometry_defined():
+            N_phis = self.get_numAngles()
+            N_rows = self.get_numRows()
+            N_cols = self.get_numCols()
+            return 4.0 * float(N_phis) * float(N_rows) * float(N_cols) / 2.0**30
+        else:
+            return 0.0
+            
+    def volume_memory(self):
+        if self.leapct.ct_volume_defined():
+            numX = self.get_numX()
+            numY = self.get_numY()
+            numZ = self.get_numZ()
+            return 4.0 * float(numX) * float(numY) * float(numZ) / 2.0**30
+        else:
+            return 0.0
+        
+    """
+    [self.PROJECTION, self.DETECTOR_ROW, self.Z_SLICE] = [0, 1, 2]
+    self.chunking_type = self.PROJECTION
+    self.num_proj = 0
+    self.num_vol = 0
+    self.scratch_space = 0.0 # extra memory reserved
+    self.chunk_size = 0
+    """
+    
+    def set_chunk_size(self):
+        if self.leapct.ct_geometry_defined() == False:
+            print('Error: CT geometry not defined!')
+            return False
+        
+        self.num_proj = max(1, self.num_proj)
+        
+        if self.chunking_type == self.PROJECTION:
+        
+            if self.num_proj * self.projection_memory < self.max_CPU_memory_usage - self.scratch_space:
+                self.chunk_size = self.leapct.get_numAngles()
+            else:
+                numAngles = self.get_numAngles()
+                #chunk_size * self.num_proj * self.projection_memory / float(numAngles) = self.max_CPU_memory_usage - self.scratch_space
+                self.chunk_size = int(np.float((self.max_CPU_memory_usage - self.scratch_space) * float(numAngles) / (self.num_proj * self.projection_memory)))
+        
+        elif self.chunking_type == self.DETECTOR_ROW:
+        
+            if self.num_proj * self.projection_memory < self.max_CPU_memory_usage - self.scratch_space:
+                self.chunk_size = self.leapct.get_numRows()
+            else:
+                numRows = self.get_numRows()
+                self.chunk_size = int(np.float((self.max_CPU_memory_usage - self.scratch_space) * float(numRows) / (self.num_proj * self.projection_memory)))
+        
+        elif self.chunking_type == self.Z_SLICE:
+            self.num_vol = max(1, self.num_vol)
+            if self.leapct.ct_volume_defined() == False:
+                print('Error: CT volume not defined!')
+                return False
+                
+            self.chunk_size = 1
+                
+        else:
+            print('Error: chunking_type value is invalid')
+            self.chunk_size = 0
+            
+        if self.chunk_size > 0:
+            return True
     
     ###################################################################################################################
     ###################################################################################################################
@@ -820,11 +897,20 @@ class leapctserver:
         if self.data_type == self.ATTENUATION:
             self.g = self.leapct.expNeg(self.g)
         
+        func = lambda g: leap_preprocessing_algorithms.makeAttenuationRadiographs(self.leapct, g, air_scan, dark_scan, ROI)
+        if func(self.g) == True:
+            self.data_type = self.ATTENUATION
+            return True
+        else:
+            return False
+        
+        """
         if leap_preprocessing_algorithms.makeAttenuationRadiographs(self.leapct, self.g, air_scan, dark_scan, ROI) == True:
             self.data_type = self.ATTENUATION
             return True
         else:
             return False
+        """
         
     def outlierCorrection(self, threshold=0.03, windowSize=3, isAttenuationData=True):
         if self.leapct.ct_geometry_defined() == False:
@@ -962,6 +1048,14 @@ class leapctserver:
             print('Error: singleMaterialBHC current only implemented for attenuation data')
             return False
             
+    def projection_processing(self, func, g):
+        func(g)
+        
+    def sinogram_processing(self):
+        pass
+        
+    def reconstruction_slab_processing(self):
+        pass
     
     ###################################################################################################################
     ###################################################################################################################
@@ -1092,6 +1186,8 @@ class leapctserver:
             return self.set_cmd(text)
         elif text.startswith("clear"):
             return self.clear_cmd(text)
+        elif text == "trackHistory":
+            return False
         else:
             print("Error cmd (" + str(text) + ") failed!")
             return False
@@ -1134,13 +1230,29 @@ class leapctserver:
             case "helicalpitch":
                 self.leapct.set_helicalPitch(0.0)
             case "nangles":
+                self.num_angles = 0
                 self.leapct.set_numAngles(0)
             case "initangle":
-                print("Set initangle not yet implemented!")
+                self.init_angle = 0.0
+                phis = self.leapct.get_angles()
+                if phis is not None:
+                    phis -= phi[0]
+                    self.leapct.set_angles(phis)
             case "arange":
-                print("Set arange not yet implemented!")
+                self.angular_range = 0.0
+                self.leapct.set_numAngles(0)
             case "rotationDirection":
-                print("Set rotationDirection not yet implemented!")
+                phis = self.leapct.get_angles()
+                if phis is not None and phis.size > 1:
+                    if phis[1] < phis[0]:
+                        phis *= -1.0
+                        self.leapct.set_angles(phis)
+            case "rotationdirection":
+                phis = self.leapct.get_angles()
+                if phis is not None and phis.size > 1:
+                    if phis[1] < phis[0]:
+                        phis *= -1.0
+                        self.leapct.set_angles(phis)
             case "nrays":
                 self.leapct.set_numCols(0)
             case "nslices":
@@ -1150,7 +1262,7 @@ class leapctserver:
             case "pzcenter":
                 self.leapct.set_centerRow(0.0)
             case "pxmidoff":
-                print("Set pxmidoff not yet implemented!")
+                leapct.set_tau(0.0)
             case "pxsize":
                 self.leapct.set_pixelWidth(0.0)
             case "pzsize":
@@ -1174,6 +1286,8 @@ class leapctserver:
                 self.reference_energy = -1.0
             case "rfilter":
                 self.leapct.set_rampFilter(2)
+            case "rampFWHM":
+                self.leapct.set_FBPlowpass(1.0)
             case "rxsize":
                 self.leapct.set_voxelWidth(0.0)
             case "rysize":
@@ -1207,9 +1321,12 @@ class leapctserver:
                 return False
         return True
     
-    def set_cmd(self, text):
+    def set_cmd(self, text, printError=True):
         key = text.split('=')[0].strip()
         value = text.split('=')[1].strip()
+        self.set_key_value_pairs(key, value)
+        
+    def set_key_value_pairs(self, key, value):
         match key:
             case "archdir":
                 self.path = value
@@ -1254,11 +1371,21 @@ class leapctserver:
             case "helicalpitch":
                 self.leapct.set_helicalPitch(float(value))
             case "nangles":
+                self.num_angles = int(value)
                 self.leapct.set_numAngles(int(value))
+                if self.num_angles > 0 and self.angular_range != 0.0:
+                    phis = self.init_angle + self.leapct.setAngleArray(self.num_angles, self.angular_range)
+                    self.leapct.set_angles(phis)
             case "initangle":
-                print("Set initangle not yet implemented!")
+                self.init_angle = float(value)
+                if self.num_angles > 0 and self.angular_range != 0.0:
+                    phis = self.init_angle + self.leapct.setAngleArray(self.num_angles, self.angular_range)
+                    self.leapct.set_angles(phis)
             case "arange":
-                print("Set arange not yet implemented!")
+                self.angular_range = float(value)
+                if self.num_angles > 0 and self.angular_range != 0.0:
+                    phis = self.init_angle + self.leapct.setAngleArray(self.num_angles, self.angular_range)
+                    self.leapct.set_angles(phis)
             case "rotationDirection":
                 print("Set rotationDirection not yet implemented!")
             case "nrays":
@@ -1270,7 +1397,8 @@ class leapctserver:
             case "pzcenter":
                 self.leapct.set_centerRow(float(value))
             case "pxmidoff":
-                print("Set pxmidoff not yet implemented!")
+                #print("Set pxmidoff not yet implemented!")
+                self.leapct.set_tau(float(value))
             case "pxsize":
                 self.leapct.set_pixelWidth(float(value))
             case "pzsize":
@@ -1297,6 +1425,10 @@ class leapctserver:
                 self.reference_energy = float(value)
             case "rfilter":
                 self.leapct.set_rampFilter(int(value))
+            case "rampID":
+                self.leapct.set_rampFilter(int(value))
+            case "rampFWHM":
+                self.leapct.set_FBPlowpass(float(value))
             case "rxsize":
                 self.leapct.set_voxelWidth(float(value))
             case "rysize":
@@ -1335,6 +1467,8 @@ class leapctserver:
                     self.leapct.set_offsetScan(False)
                 else:
                     print("Error setting offsetScan")
+            case "trackHistory":
+                pass
             case _:
                 print("Error: cmd keyword " + str(key) + " not yet implemented!")
                 return False
@@ -1426,10 +1560,15 @@ class leapctserver:
             case "arange":
                 return str(self.leapct.get_angularRange())
             case "rotationDirection":
-                if self.leapct.get_angularRange() > 0.0:
-                    return "CCW"
+                if self.leapct.get_angularRange() >= 0.0:
+                    return "COUNTERCLOCKWISE"
                 else:
-                    return "CW"
+                    return "CLOCKWISE"
+            case "rotationdirection":
+                if self.leapct.get_angularRange() >= 0.0:
+                    return "COUNTERCLOCKWISE"
+                else:
+                    return "CLOCKWISE"
             case "nrays":
                 return str(self.leapct.get_numCols())
             case "nslices":
@@ -1439,8 +1578,11 @@ class leapctserver:
             case "pzcenter":
                 return str(self.leapct.get_centerRow())
             case "pxmidoff":
-                print("Error: getParams pxmidoff not yet implemented!")
-                return str(0.0)
+                #print("Error: getParams pxmidoff not yet implemented!")
+                #return str(0.0)
+                return str(self.leapct.get_tau())
+            case "tau":
+                return str(self.leapct.get_tau())
             case "pxsize":
                 return str(self.leapct.get_pixelWidth())
             case "pzsize":
@@ -1463,8 +1605,11 @@ class leapctserver:
             case "referenceEnergy":
                 return str(self.reference_energy)
             case "rfilter":
-                print("Warning: getParam rfilter not yet implemented!")
-                return str(2)
+                return str(self.leapct.get_rampFilter())
+            case "rampID":
+                return str(self.leapct.get_rampFilter())
+            case "rampFWHM":
+                return str(self.leapct.get_FBPlowpass())
             case "rxsize":
                 return str(self.leapct.get_voxelWidth())
             case "rysize":
@@ -1499,8 +1644,7 @@ class leapctserver:
             case "rzelements":
                 return str(self.leapct.get_numZ())
             case "halfscan":
-                print("Warning: getParam halfscan not yet implemented!")
-                return ""
+                return str(self.leapct.get_offsetScan())
             case "ImageJpath":
                 return ""
             case "LTTcmd":
@@ -1517,6 +1661,8 @@ class leapctserver:
                 return "False"
             case "fileType":
                 return "tif"
+            case "untruncatedProjection":
+                return "0"
             case _:
                 print("Error: getParam keyword " + str(text) +  " not yet implemented!")
                 return ""
@@ -1644,6 +1790,11 @@ class leapctserver:
                     return True
                 else:
                     return False
+            case "rotationdirection":
+                if self.leapct.get_angularRange() == 0.0:
+                    return True
+                else:
+                    return False
             case "nrays":
                 if self.leapct.get_numCols() > 0:
                     return False
@@ -1706,8 +1857,7 @@ class leapctserver:
                 else:
                     return True
             case "rfilter":
-                print("Warning: getParam rfilter not yet implemented!")
-                return str(2)
+                return False
             case "rxsize":
                 if self.leapct.get_voxelWidth() > 0.0:
                     return False
@@ -1780,6 +1930,19 @@ class leapctserver:
             case _:
                 print("Error: getParam keyword " + str(text) +  " not yet implemented!")
                 return ""
+
+    def loadsct(self, fileName):
+        if endswith(fileName) == '.sct':
+            fdes = open(fileName, 'r')
+            Lines = file1.readlines()
+            for line in Lines:
+                if line[0] == '-':
+                    line = line[1:]
+                    x = line.split(' ', 1)
+                    if len(x) == 2:
+                        self.set_key_value_pairs(x[0], x[1])
+        else:
+            print('This is not an sct file')
         
     def getHelpText(self, text, length=0):
         return "---"
