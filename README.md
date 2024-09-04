@@ -24,6 +24,12 @@ Although not required, we also recommend installing the [XrayPhysics](https://gi
 ## Usage
 To launch the LEAP-CT GUI, do 
 
+```
+git clone https://github.com/kylechampley/LEAPCT-UI-GUI.git
+cd LEAPCT-UI-GUI
+python leapctrails/launch_leapctrails.py
+```
+
 
 ## Future Releases
 
@@ -34,12 +40,6 @@ For the next releases, we are working on the following:
 4) Add iterative reconstruction algorithms
 5) Add integrated image/ volume viewing capabilities
 6) Ability to generate more physics plots
-
-```
-git clone https://github.com/kylechampley/LEAPCT-UI-GUI.git
-cd LEAPCT-UI-GUI
-python leapctrails/launch_leapctrails.py
-```
 
 
 ## Author
