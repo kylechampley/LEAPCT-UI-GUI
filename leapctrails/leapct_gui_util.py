@@ -105,6 +105,6 @@ def parseMaterials(text):
     
     
 #retVal = parsePDstring('{material=water}{formula=H2O; rho=1.2e-3}')
-retVal = parseMaterials('{material=water}{formula=H2O; rho=1.2e-3}')
+#retVal = parseMaterials('{material=water}{formula=H2O; rho=1.2e-3}')
 #retVal = parseFilters('{material=Al; thickness=2}{formula=Cu; rho=7e-3; thickness=1}')
-print(retVal)
+#print(retVal)

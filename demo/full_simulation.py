@@ -59,9 +59,10 @@ ind = np.abs(np.random.normal(0,1,g.shape)) > 3.0
 g[ind] = 0.0
 
 # Simulate air scan, dark current image, and flux variation
-air_scan = 50000.0*np.ones((numRows, numCols),dtype=np.float32)
+air_scan = 50000.0*np.ones((numRows, numCols), dtype=np.float32)
 dark_scan = np.random.normal(50.0, 2.0, (numRows,numCols))
 dark_scan[dark_scan<0.0] = 0.0
+dark_scan = np.ascontiguousarray(dark_scan, dtype=np.float32)
 flux = np.random.normal(1.0, 0.01, (numAngles))
 
 print(np.max(flux))
