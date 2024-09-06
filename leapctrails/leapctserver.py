@@ -23,6 +23,8 @@ try:
 except:
     has_physics = False
 
+root_path = os.path.dirname(os.path.realpath(__file__))
+
 class leapctserver:
 
     def __init__(self, leapct=None, path=None, outputDir=None):
@@ -56,12 +58,6 @@ class leapctserver:
         else:
             self.outputDir = outputDir
 
-        """ Create folders if they do not exist
-        fullPath = os.path.join(self.path, self.outputDir)
-        if not os.path.exists(fullPath):
-            os.makedirs(fullPath)
-        #"""
-        
         # File name for air scan data
         self.air_scan_file = None
         
@@ -143,11 +139,28 @@ class leapctserver:
         self.num_angles = 0.0
         
         ### Other
+        #self.leapct.reset() # use clearAll
         self.lastImage = None
+        
+        self.restore_defaults()
         
     def clearAll(self):
         self.reset()
         self.leapct.reset()
+        
+    def save_defaults(self):
+        defaults_file = os.path.join(root_path, "leapctserver_defaults.txt")
+        f = open(defaults_file, "w")
+        
+        #if self.path is not None and len(self.path) > 0:
+        #    f.write('path = ' + self.path + '\n')
+        
+        f.close()
+        
+    def restore_defaults(self):
+        defaults_file = os.path.join(root_path, "leapctserver_defaults.txt")
+        if os.path.isfile(defaults_file):
+            self.load_parameters(defaults_file)
         
     def is_number(self, s):
         if s is None:
@@ -159,24 +172,34 @@ class leapctserver:
             return False
     
     def print_parameters(self):
-        print('======== File I/O ========')
-        print('path = ', self.path)
-        print('air_scan_file = ', self.air_scan_file)
-        print('dark_scan_file = ', self.dark_scan_file)
-        print('raw_scan_file = ', self.raw_scan_file)
-        print('reconstruction_file = ', self.reconstruction_file)
+        print('\n======== File I/O ========')
+        if self.path is not None:
+            print('path = ', self.path)
+        if self.air_scan_file is not None:
+            print('air_scan_file = ', self.air_scan_file)
+        if self.dark_scan_file is not None:
+            print('dark_scan_file = ', self.dark_scan_file)
+        if self.raw_scan_file is not None:
+            print('raw_scan_file = ', self.raw_scan_file)
+        if self.reconstruction_file is not None:
+            print('reconstruction_file = ', self.reconstruction_file)
+        print('')
         
         print('======== Physics ========')
         if self.source_spectra_file is not None and len(self.source_spectra_file) > 0:
             print('source_spectra_file = ', self.source_spectra_file)
-        elif kV > 0.0:
+        elif self.kV > 0.0:
             print('kV = ', self.kV)
             print('anode_material = ', self.anode_material)
             print('takeoff_angle = ', self.takeoff_angle)
-        print('x_ray_filters = ', self.xray_filters)
-        print('detector_response_model = ', self.detector_response_model)
-        print('object_model = ', self.object_model)
-        print('reference_energy = ', self.reference_energy)
+        if self.xray_filters is not None:
+            print('xray_filters = ', self.xray_filters)
+        if self.detector_response_model is not None:
+            print('detector_response_model = ', self.detector_response_model)
+        if self.object_model is not None:
+            print('object_model = ', self.object_model)
+        if self.reference_energy > 0.0:
+            print('reference_energy = ', self.reference_energy)
         
         self.leapct.print_parameters()
         """
@@ -443,7 +466,7 @@ class leapctserver:
         self.create_outputDir()
         if fileName is None or len(fileName) == 0:
             fileName = os.path.join(self.path, self.outputDir, 'leapct_params.txt')
-        elif fileName.startswith(self.path) == False:
+        elif fileName.startswith(self.path) == False and os.path.isabs(fileName) == False:
             fileName = os.path.join(self.path, self.outputDir, fileName)
         self.save_geometry_file()
         
@@ -480,6 +503,23 @@ class leapctserver:
             f.write('data_type = TRANSMISSION\n')
         elif self.data_type == self.ATTENUATION:
             f.write('data_type = ATTENUATION\n')
+            
+        #"""
+        if self.source_spectra_file is not None and len(self.source_spectra_file) > 0:
+            f.write('source_spectra_file = ' + self.source_spectra_file + '\n')
+        elif self.kV > 0.0:
+            f.write('kV = ' + str(self.kV) + '\n')
+            f.write('anode_material = ' + str(self.anode_material) + '\n')
+            f.write('takeoff_angle = ' + str(self.takeoff_angle) + '\n')
+        if self.xray_filters is not None:
+            f.write('xray_filters = ' + str(self.xray_filters) + '\n')
+        if self.detector_response_model is not None:
+            f.write('detector_response_model = ' + str(self.detector_response_model) + '\n')
+        if self.object_model is not None:
+            f.write('object_model = ' + str(self.object_model) + '\n')
+        if self.reference_energy > 0.0:
+            f.write('reference_energy = ' + str(self.reference_energy) + '\n')
+        #"""
         
         f.close()
         #self.save_spectra_model()
@@ -978,7 +1018,7 @@ class leapctserver:
     def clear_detector_response(self):
         self.detector_response_model = None
         
-    def set_object_model(self, material, mass_density):
+    def set_object_model(self, material, mass_density=None):
         if mass_density is None or mass_density == 0.0:
             mass_density = self.physics.massDensity(material)
         self.object_model = [material, mass_density]
@@ -2199,7 +2239,20 @@ class leapctserver:
             case "anodeMaterial":
                 self.anode_material = int(value)
             case "filterMaterials" | "xray_filters":
-                self.xray_filters = value
+                if value[0] == '[':
+                    self.xray_filters = eval(value)
+                else:
+                    self.xray_filters = value
+            case "object_model":
+                if value[0] == '[':
+                    self.object_model = eval(value)
+                else:
+                    self.object_model = value
+            case "detector_response_model":
+                if value[0] == '[':
+                    self.detector_response_model = eval(value)
+                else:
+                    self.detector_response_model = value
             case "spectraFile" | "source_spectra_file":
                 #self.spectra_model_file = value
                 self.source_spectra_file = value
