@@ -35,16 +35,16 @@ class CTvolumePage(QWidget):
         x_group = QGroupBox("X Samples")
         x_grid = QGridLayout()
         
-        x_count_label = QLabel("<div align='right'>count</div>")
+        self.x_count_label = QLabel("<div align='right'>count</div>")
         self.x_count_edit = QLineEdit()
         self.x_count_edit.editingFinished.connect(self.push_numX)
-        x_grid.addWidget(x_count_label, 0, 0)
+        x_grid.addWidget(self.x_count_label, 0, 0)
         x_grid.addWidget(self.x_count_edit, 0, 1)
         
-        x_pitch_label = QLabel("<div align='right'>pitch (mm)</div>")
+        self.x_pitch_label = QLabel("<div align='right'>pitch (mm)</div>")
         self.x_pitch_edit = QLineEdit()
         self.x_pitch_edit.editingFinished.connect(self.push_Tx)
-        x_grid.addWidget(x_pitch_label, 1, 0)
+        x_grid.addWidget(self.x_pitch_label, 1, 0)
         x_grid.addWidget(self.x_pitch_edit, 1, 1)
         
         x_offset_label = QLabel("<div align='right'>offset (mm)</div>")
@@ -53,8 +53,8 @@ class CTvolumePage(QWidget):
         x_grid.addWidget(x_offset_label, 2, 0)
         x_grid.addWidget(self.x_offset_edit, 2, 1)
         
-        x_count_label.setToolTip("number of voxels in the x-dimension")
-        x_pitch_label.setToolTip("voxel pitch (size) in the x and y dimensions, measured in mm")
+        self.x_count_label.setToolTip("number of voxels in the x-dimension")
+        self.x_pitch_label.setToolTip("voxel pitch (size) in the x and y dimensions, measured in mm")
         x_offset_label.setToolTip(" shift the volume in the x-dimension, measured in mm")
         
         x_group.setLayout(x_grid)
@@ -64,16 +64,16 @@ class CTvolumePage(QWidget):
         y_group = QGroupBox("Y Samples")
         y_grid = QGridLayout()
         
-        y_count_label = QLabel("<div align='right'>count</div>")
+        self.y_count_label = QLabel("<div align='right'>count</div>")
         self.y_count_edit = QLineEdit()
         self.y_count_edit.editingFinished.connect(self.push_numY)
-        y_grid.addWidget(y_count_label, 0, 0)
+        y_grid.addWidget(self.y_count_label, 0, 0)
         y_grid.addWidget(self.y_count_edit, 0, 1)
         
-        y_pitch_label = QLabel("<div align='right'>pitch (mm)</div>")
+        self.y_pitch_label = QLabel("<div align='right'>pitch (mm)</div>")
         self.y_pitch_edit = QLineEdit()
         self.y_pitch_edit.editingFinished.connect(self.push_Ty)
-        y_grid.addWidget(y_pitch_label, 1, 0)
+        y_grid.addWidget(self.y_pitch_label, 1, 0)
         y_grid.addWidget(self.y_pitch_edit, 1, 1)
         
         y_offset_label = QLabel("<div align='right'>offset (mm)</div>")
@@ -82,8 +82,8 @@ class CTvolumePage(QWidget):
         y_grid.addWidget(y_offset_label, 2, 0)
         y_grid.addWidget(self.y_offset_edit, 2, 1)
         
-        y_count_label.setToolTip("number of voxels in the y-dimension")
-        y_pitch_label.setToolTip("voxel pitch (size) in the x and y dimensions, measured in mm")
+        self.y_count_label.setToolTip("number of voxels in the y-dimension")
+        self.y_pitch_label.setToolTip("voxel pitch (size) in the x and y dimensions, measured in mm")
         y_offset_label.setToolTip(" shift the volume in the y-dimension, measured in mm")
         
         y_group.setLayout(y_grid)
@@ -93,16 +93,16 @@ class CTvolumePage(QWidget):
         z_group = QGroupBox("Z Samples")
         z_grid = QGridLayout()
         
-        z_count_label = QLabel("<div align='right'>count</div>")
+        self.z_count_label = QLabel("<div align='right'>count</div>")
         self.z_count_edit = QLineEdit()
         self.z_count_edit.editingFinished.connect(self.push_numZ)
-        z_grid.addWidget(z_count_label, 0, 0)
+        z_grid.addWidget(self.z_count_label, 0, 0)
         z_grid.addWidget(self.z_count_edit, 0, 1)
         
-        z_pitch_label = QLabel("<div align='right'>pitch (mm)</div>")
+        self.z_pitch_label = QLabel("<div align='right'>pitch (mm)</div>")
         self.z_pitch_edit = QLineEdit()
         self.z_pitch_edit.editingFinished.connect(self.push_Tz)
-        z_grid.addWidget(z_pitch_label, 1, 0)
+        z_grid.addWidget(self.z_pitch_label, 1, 0)
         z_grid.addWidget(self.z_pitch_edit, 1, 1)
         
         z_offset_label = QLabel("<div align='right'>offset (mm)</div>")
@@ -111,8 +111,8 @@ class CTvolumePage(QWidget):
         z_grid.addWidget(z_offset_label, 2, 0)
         z_grid.addWidget(self.z_offset_edit, 2, 1)
         
-        z_count_label.setToolTip("number of voxels in the z-dimension")
-        z_pitch_label.setToolTip("voxel pitch (size) in the z-dimension, measured in mm")
+        self.z_count_label.setToolTip("number of voxels in the z-dimension")
+        self.z_pitch_label.setToolTip("voxel pitch (size) in the z-dimension, measured in mm")
         z_offset_label.setToolTip(" shift the volume in the z-dimension, measured in mm")
         
         z_group.setLayout(z_grid)
@@ -130,9 +130,6 @@ class CTvolumePage(QWidget):
         self.dFOV_default_radio = QRadioButton("use default")
         self.dFOV_off_radio = QRadioButton("turn off")
         self.dFOV_specify_radio = QRadioButton("custom")
-        self.dFOV_default_radio.clicked.connect(self.dFOV_default_radio_Clicked)
-        self.dFOV_off_radio.clicked.connect(self.dFOV_off_radio_Clicked)
-        self.dFOV_specify_radio.clicked.connect(self.dFOV_specify_radio_Clicked)
         self.dFOV_edit = QLineEdit()
         self.dFOV_edit.editingFinished.connect(self.push_dFOV)
         dFOV_grid.addWidget(self.dFOV_default_radio, 0, 0)
@@ -216,6 +213,30 @@ class CTvolumePage(QWidget):
         self.setLayout(overall_grid)
         self.refresh()
     
+    def set_text_color(self):
+        if self.leapct.get_numX() > 0:
+            self.x_count_label.setStyleSheet('color: black')
+        else:
+            self.x_count_label.setStyleSheet('color: red')
+        if self.leapct.get_numY() > 0:
+            self.y_count_label.setStyleSheet('color: black')
+        else:
+            self.y_count_label.setStyleSheet('color: red')
+        if self.leapct.get_numZ() > 0:
+            self.z_count_label.setStyleSheet('color: black')
+        else:
+            self.z_count_label.setStyleSheet('color: red')
+        if self.leapct.get_voxelWidth() > 0.0:
+            self.x_pitch_label.setStyleSheet('color: black')
+            self.y_pitch_label.setStyleSheet('color: black')
+        else:
+            self.x_pitch_label.setStyleSheet('color: red')
+            self.y_pitch_label.setStyleSheet('color: red')
+        if self.leapct.get_voxelHeight() > 0.0:
+            self.z_pitch_label.setStyleSheet('color: black')
+        else:
+            self.z_pitch_label.setStyleSheet('color: red')
+    
     def refresh(self):
     
         if self.leapct.ct_geometry_defined() == True and self.leapct.ct_volume_defined() == False:
@@ -245,10 +266,12 @@ class CTvolumePage(QWidget):
         if self.leapct.wmax is not None:
             self.wmax_edit.setText(str(self.leapct.wmax))
         #"""
+        self.set_text_color()
         
     def pushAllParameters(self):
         pass
     
+    """
     def dFOV_default_radio_Clicked(self):
         self.push_dFOV()
         
@@ -257,6 +280,7 @@ class CTvolumePage(QWidget):
         
     def dFOV_specify_radio_Clicked(self):
         self.push_dFOV()
+    """
     
     def push_dFOV(self):
         d = self.string_to_float(self.dFOV_edit.text())
@@ -307,12 +331,15 @@ class CTvolumePage(QWidget):
     
     def dFOV_default_radio_Clicked(self):
         self.dFOV_edit.setEnabled(False)
+        self.push_dFOV()
         
     def dFOV_off_radio_Clicked(self):
         self.dFOV_edit.setEnabled(False)
+        self.push_dFOV()
         
     def dFOV_specify_radio_Clicked(self):
         self.dFOV_edit.setEnabled(True)
+        self.push_dFOV()
     
     def default_volume_button_Clicked(self):
         scale = 1.0
@@ -334,6 +361,7 @@ class CTvolumePage(QWidget):
             except:
                 self.leapct.set_numX(0)
                 self.x_count_edit.setText("")
+        self.set_text_color()
                 
     def push_Tx(self):
         if len(self.x_pitch_edit.text()) == 0:
@@ -346,6 +374,7 @@ class CTvolumePage(QWidget):
                 self.leapct.set_voxelWidth(0.0)
                 self.x_pitch_edit.setText("")
         self.y_pitch_edit.setText(self.x_pitch_edit.text())
+        self.set_text_color()
         
     def push_offsetX(self):
         if len(self.x_offset_edit.text()) == 0:
@@ -368,6 +397,7 @@ class CTvolumePage(QWidget):
             except:
                 self.leapct.set_numY(0)
                 self.y_count_edit.setText("")
+        self.set_text_color()
                 
     def push_Ty(self):
         if len(self.y_pitch_edit.text()) == 0:
@@ -380,6 +410,7 @@ class CTvolumePage(QWidget):
                 self.leapct.set_voxelWidth(0.0)
                 self.y_pitch_edit.setText("")
         self.x_pitch_edit.setText(self.y_pitch_edit.text())
+        self.set_text_color()
         
     def push_offsetY(self):
         if len(self.y_offset_edit.text()) == 0:
@@ -402,6 +433,7 @@ class CTvolumePage(QWidget):
             except:
                 self.leapct.set_numZ(0)
                 self.z_count_edit.setText("")
+        self.set_text_color()
                 
     def push_Tz(self):
         if len(self.z_pitch_edit.text()) == 0:
@@ -413,6 +445,7 @@ class CTvolumePage(QWidget):
             except:
                 self.leapct.set_voxelHeight(0.0)
                 self.z_pitch_edit.setText("")
+        self.set_text_color()
         
     def push_offsetZ(self):
         if len(self.z_offset_edit.text()) == 0:
@@ -464,6 +497,7 @@ class CTvolumePage(QWidget):
             self.z_offset_edit.setText(str(self.leapct.get_offsetZ()))
         else:
             self.z_offset_edit.setText(str(""))
+        self.set_text_color()
             
     def string_to_float(self, txt):
         if txt is None:

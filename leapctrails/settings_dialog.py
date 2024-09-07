@@ -98,9 +98,14 @@ class SettingsDialogControls(QWidget):
         overallgrid.addWidget(logging_group, curRow, 0)
         curRow += 1
         
+        bottum_button_layout = QHBoxLayout()
         self.keyboard_button = QPushButton("keyboard")
+        self.save_defaults_button = QPushButton("save defaults")
         self.keyboard_button.clicked.connect(self.keyboard_button_Clicked)
-        overallgrid.addWidget(self.keyboard_button, curRow, 0)
+        self.save_defaults_button.clicked.connect(self.save_defaults_button_Clicked)
+        bottum_button_layout.addWidget(self.keyboard_button)
+        bottum_button_layout.addWidget(self.save_defaults_button)
+        overallgrid.addLayout(bottum_button_layout, curRow, 0)
         curRow += 1
         
         self.setLayout(overallgrid)
@@ -127,6 +132,9 @@ class SettingsDialogControls(QWidget):
             self.gpu_four_check.setChecked(False)
         self.memory_edit.setText(str(self.lctserver.max_CPU_memory_usage))
         
+    def save_defaults_button_Clicked(self):
+        self.lctserver.save_defaults()
+    
     def gpu_clicked(self):
         gpuList = []
         if self.gpu_one_check.isChecked():

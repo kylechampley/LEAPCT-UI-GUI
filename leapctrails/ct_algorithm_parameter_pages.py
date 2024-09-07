@@ -951,7 +951,18 @@ class FBPParametersPage(AlgorithmParameterPage):
         
         overall_layout = QGridLayout()
         self.do_clipping_check = QCheckBox("clipping")
+        
+        preview_slice_axis_label = QLabel("<div align='right'>preview slice axis</div>")
+        self.preview_slice_axis_combo = QComboBox()
+        self.preview_slice_axis_combo.addItems(['x','y','z'])
+        self.preview_slice_axis_combo.setMaximumWidth(30)
+        self.preview_slice_axis_combo.setCurrentIndex(2)
         overall_layout.addWidget(self.do_clipping_check, 0, 0)
+        overall_layout.addWidget(preview_slice_axis_label, 1, 0)
+        overall_layout.addWidget(self.preview_slice_axis_combo, 1, 1)
+        
+        overall_layout.setRowStretch(overall_layout.rowCount(), 1)
+        overall_layout.setColumnStretch(overall_layout.columnCount(), 1)
         
         # Add the help/preview/execute button box in the lower right corner:
         exe_buttons_layout = QHBoxLayout()
@@ -985,7 +996,13 @@ class FBPParametersPage(AlgorithmParameterPage):
                 ind = None
         else:
             ind = None
-        f_slice = self.lctserver.FBP_slice(islice=ind, coord='z')
+        if self.preview_slice_axis_combo.currentIndex() == 0:
+            axis_name = 'x'
+        elif self.preview_slice_axis_combo.currentIndex() == 1:
+            axis_name = 'y'
+        else:
+            axis_name = 'z'
+        f_slice = self.lctserver.FBP_slice(islice=ind, coord=axis_name)
         if self.do_clipping_check.isChecked():
             f_slice[f_slice<0.0] = 0.0
         plt.imshow(np.squeeze(f_slice), cmap='gray', interpolation='nearest')

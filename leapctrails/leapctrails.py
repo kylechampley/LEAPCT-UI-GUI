@@ -20,7 +20,7 @@ class leapctrails(QMainWindow):
     def __init__(self, lctserver=None, parent = None):
         super(leapctrails, self).__init__(parent)
 
-        self.versionNumber = "0.1"
+        self.versionNumber = "0.2"
         print ("LEAP-CT Rails v" + str(self.versionNumber))
         if lctserver is None:
             self.lctserver = leapctserver()

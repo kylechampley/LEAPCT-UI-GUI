@@ -152,10 +152,15 @@ class leapctserver:
         defaults_file = os.path.join(root_path, "leapctserver_defaults.txt")
         f = open(defaults_file, "w")
         
-        #if self.path is not None and len(self.path) > 0:
-        #    f.write('path = ' + self.path + '\n')
+        f.write('max_CPU_memory_usage = ' + str(self.max_CPU_memory_usage) + '\n')
+        
+        f.write('GPUs = [')
+        data = self.leapct.get_gpus()
+        f.write(','.join(str(i) for i in data))
+        f.write(']\n')
         
         f.close()
+        print('leapctserver defaults saved to: ' + str(defaults_file))
         
     def restore_defaults(self):
         defaults_file = os.path.join(root_path, "leapctserver_defaults.txt")
@@ -520,6 +525,9 @@ class leapctserver:
         if self.reference_energy > 0.0:
             f.write('reference_energy = ' + str(self.reference_energy) + '\n')
         #"""
+        
+        #f.write('max_CPU_memory_usage = ' + str(self.max_CPU_memory_usage) + '\n')
+        #f.write('GPUs = ' + str(self.leapct.get_gpus()) + '\n')
         
         f.close()
         #self.save_spectra_model()
@@ -2129,7 +2137,8 @@ class leapctserver:
     def set_cmd(self, text, printError=True):
         key = text.split('=')[0].strip()
         value = text.split('=')[1].strip()
-        self.set_key_value_pairs(key, value, printError)
+        if len(key) > 0 and len(value) > 0:
+            self.set_key_value_pairs(key, value, printError)
         
     def set_key_value_pairs(self, key, value, printError=True):
         match key:
@@ -2159,12 +2168,16 @@ class leapctserver:
                 self.raw_scan_file = value + str("*[0-9].tif")
             case "pfile" | "projection_file":
                 self.projection_file = value
-            case "rfile":
+            case "rfile" | "reconstruction_file":
                 self.reconstruction_file = value
             case "systemGeometryFile" | "system_geometry_file" | "geometry_file":
                 self.geometry_file = value
             case "lengthUnits":
                 pass
+            case "max_CPU_memory_usage" | "maxMemoryUsage":
+                self.max_CPU_memory_usage = float(value)
+            case "GPUs" | "gpus":
+                self.leapct.set_gpus(list(eval(value)))
             case "bgeometry" | "geometry":
                 self.leapct.set_geometry(value)
             case "geometry":
@@ -2234,9 +2247,9 @@ class leapctserver:
                 self.detector_response_file = value
             case "kV" | "Source Voltage (kV)":
                 self.kV = float(value)
-            case "takeOffAngle":
+            case "takeOffAngle" | "takeoff_angle":
                 self.takeoff_angle = float(value)
-            case "anodeMaterial":
+            case "anodeMaterial" | "anode_material":
                 self.anode_material = int(value)
             case "filterMaterials" | "xray_filters":
                 if value[0] == '[':
@@ -2807,7 +2820,7 @@ class leapctserver:
             self.air_scan_file = "57363.766"
             self.data_type = self.RAW_DARK_SUBTRACTED
             self.leapct.set_centerCol((self.leapct.get_numCols()-1)/2.0)
-            #self.leapct.set_centerRow((self.leapct.get_numRows()-1)/2.0)
+            self.leapct.set_centerRow(self.leapct.get_numRows()-1-(self.leapct.get_numRows()-1)/2.0)
             self.takeoff_angle = 38.0
             self.set_detector_response('Gd2O2S', 7.32e-3, 0.02)
         else:

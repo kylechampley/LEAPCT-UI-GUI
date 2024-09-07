@@ -70,9 +70,9 @@ class FileNamesPage(QWidget):
         curRow += 1
         
         ######### DATA TYPE START #########
-        dataType_group = QGroupBox("Projection Data Type")
+        self.dataType_group = QGroupBox("Projection Data Type")
         dataType_radio_vlayout = QVBoxLayout()
-        dataType_group.setToolTip("These radio buttons specify the state of the given radiographs which informs leap how to convert them into attenuation radiographs which is needed for reconstruction.\nNote that this button just describes the data and does not perform any manipulations.  See the \"Make Atten Rads\" function")
+        self.dataType_group.setToolTip("These radio buttons specify the state of the given radiographs which informs leap how to convert them into attenuation radiographs which is needed for reconstruction.\nNote that this button just describes the data and does not perform any manipulations.  See the \"Make Atten Rads\" function")
 
         # Raw, uncalibrated:
         self.raw_radio = QRadioButton("Raw Radiograph")
@@ -98,8 +98,8 @@ class FileNamesPage(QWidget):
         self.attenuationRadiograph_radio.clicked.connect(self.attenuationRadiograph_radio_Clicked)
         dataType_radio_vlayout.addWidget(self.attenuationRadiograph_radio)
 
-        dataType_group.setLayout(dataType_radio_vlayout)
-        overall_grid.addWidget(dataType_group, curRow, 0, 1, 2)
+        self.dataType_group.setLayout(dataType_radio_vlayout)
+        overall_grid.addWidget(self.dataType_group, curRow, 0, 1, 2)
         ######### DATA TYPE END #########
         
         
@@ -124,29 +124,29 @@ class FileNamesPage(QWidget):
         self.display_raw_button.clicked.connect(self.display_raw_button_Clicked)
         self.display_raw_button.setToolTip("Click button to view radiograph data in napari")
         
-        air_button = QPushButton("Air Scan File")
-        air_button.clicked.connect(self.browse_air_Clicked)
-        air_button.setToolTip("Set the base name of the tif file where the air scan radiograph data is stored (if it exists).  Click button to open file browser.")
+        self.air_button = QPushButton("Air Scan File")
+        self.air_button.clicked.connect(self.browse_air_Clicked)
+        self.air_button.setToolTip("Set the base name of the tif file where the air scan radiograph data is stored (if it exists).  Click button to open file browser.")
         self.air_edit = QLineEdit()
         self.air_edit.editingFinished.connect(self.push_air_file)
         self.display_air_button = QPushButton("display")
         self.display_air_button.clicked.connect(self.display_air_button_Clicked)
         self.display_air_button.setToolTip("Click button to view air scan data")
         
-        dark_button = QPushButton("Dark Scan File")
-        dark_button.clicked.connect(self.browse_dark_Clicked)
-        dark_button.setToolTip("Set the base name of the tif file where the dark scan radiograph data is stored (if it exists).  Click button to open file browser.")
+        self.dark_button = QPushButton("Dark Scan File")
+        self.dark_button.clicked.connect(self.browse_dark_Clicked)
+        self.dark_button.setToolTip("Set the base name of the tif file where the dark scan radiograph data is stored (if it exists).  Click button to open file browser.")
         self.dark_edit = QLineEdit()
         self.dark_edit.editingFinished.connect(self.push_dark_file)
         self.display_dark_button = QPushButton("display")
         self.display_dark_button.clicked.connect(self.display_dark_button_Clicked)
         self.display_dark_button.setToolTip("Click button to view dark scan data")
         
-        file_grid.addWidget(dark_button, 0, 0)
+        file_grid.addWidget(self.dark_button, 0, 0)
         file_grid.addWidget(self.dark_edit, 0, 1)
         file_grid.addWidget(self.display_dark_button, 0, 2)
         
-        file_grid.addWidget(air_button, 1, 0)
+        file_grid.addWidget(self.air_button, 1, 0)
         file_grid.addWidget(self.air_edit, 1, 1)
         file_grid.addWidget(self.display_air_button, 1, 2)
         
@@ -173,12 +173,24 @@ class FileNamesPage(QWidget):
             self.lctserver.projection_file = self.raw_edit.text()
         else:
             self.lctserver.raw_scan_file = self.raw_edit.text()
+        if len(self.raw_edit.text()) > 0:
+            self.raw_button.setStyleSheet('color: black')
+        else:
+            self.raw_button.setStyleSheet('color: red')
         
     def push_air_file(self):
         self.lctserver.air_scan_file = self.air_edit.text()
+        if len(self.air_edit.text()) > 0:
+            self.air_button.setStyleSheet('color: black')
+        else:
+            self.air_button.setStyleSheet('color: red')
         
     def push_dark_file(self):
         self.lctserver.dark_scan_file = self.dark_edit.text()
+        if len(self.dark_edit.text()) > 0:
+            self.dark_button.setStyleSheet('color: black')
+        else:
+            self.dark_button.setStyleSheet('color: red')
     
     def display_volume_button_Clicked(self):
         if self.lctserver.f is None:
@@ -220,18 +232,24 @@ class FileNamesPage(QWidget):
             self.raw_radio.setChecked(True)
             self.raw_button.setText("Raw Radiograph Files")
             self.raw_edit.setText(self.lctserver.raw_scan_file)
+            self.dataType_group.setStyleSheet('color: black')
         elif self.lctserver.data_type == self.lctserver.RAW_DARK_SUBTRACTED:
             self.rawDarkSubtracted_radio.setChecked(True)
             self.raw_button.setText("Raw Radiograph Files")
             self.raw_edit.setText(self.lctserver.raw_scan_file)
+            self.dataType_group.setStyleSheet('color: black')
         elif self.lctserver.data_type == self.lctserver.TRANSMISSION:
             self.transmissionRadiograph_radio.setChecked(True)
             self.raw_button.setText("Projection Files")
             self.raw_edit.setText(self.lctserver.projection_file)
+            self.dataType_group.setStyleSheet('color: black')
         elif self.lctserver.data_type == self.lctserver.ATTENUATION:
             self.attenuationRadiograph_radio.setChecked(True)
             self.raw_button.setText("Projection Files")
             self.raw_edit.setText(self.lctserver.projection_file)
+            self.dataType_group.setStyleSheet('color: black')
+        else:
+            self.dataType_group.setStyleSheet('color: red')
         
         self.outputDir_edit.setText(self.lctserver.outputDir)
         
@@ -323,21 +341,59 @@ class FileNamesPage(QWidget):
         self.lctserver.data_type = self.lctserver.RAW
         self.raw_button.setText("Raw Radiograph Files")
         self.raw_edit.setText(self.lctserver.raw_scan_file)
+        self.dataType_group.setStyleSheet('color: black')
+        if len(self.dark_edit.text()) > 0:
+            self.dark_button.setStyleSheet('color: black')
+        else:
+            self.dark_button.setStyleSheet('color: red')
+        if len(self.air_edit.text()) > 0:
+            self.air_button.setStyleSheet('color: black')
+        else:
+            self.air_button.setStyleSheet('color: red')
+        if len(self.raw_edit.text()) > 0:
+            self.raw_button.setStyleSheet('color: black')
+        else:
+            self.raw_button.setStyleSheet('color: red')
+        
         
     def rawDarkSubtracted_radio_Clicked(self):
         self.lctserver.data_type = self.lctserver.RAW_DARK_SUBTRACTED
         self.raw_button.setText("Raw Radiograph Files")
         self.raw_edit.setText(self.lctserver.raw_scan_file)
+        self.dataType_group.setStyleSheet('color: black')
+        self.dark_button.setStyleSheet('color: black')
+        if len(self.air_edit.text()) > 0:
+            self.air_button.setStyleSheet('color: black')
+        else:
+            self.air_button.setStyleSheet('color: red')
+        if len(self.raw_edit.text()) > 0:
+            self.raw_button.setStyleSheet('color: black')
+        else:
+            self.raw_button.setStyleSheet('color: red')
         
     def transmissionRadiograph_radio_Clicked(self):
         self.lctserver.data_type = self.lctserver.TRANSMISSION
         self.raw_button.setText("Projection Files")
         self.raw_edit.setText(self.lctserver.projection_file)
+        self.dataType_group.setStyleSheet('color: black')
+        self.dark_button.setStyleSheet('color: black')
+        self.air_button.setStyleSheet('color: black')
+        if len(self.raw_edit.text()) > 0:
+            self.raw_button.setStyleSheet('color: black')
+        else:
+            self.raw_button.setStyleSheet('color: red')
         
     def attenuationRadiograph_radio_Clicked(self):
         self.lctserver.data_type = self.lctserver.ATTENUATION
         self.raw_button.setText("Projection Files")
         self.raw_edit.setText(self.lctserver.projection_file)
+        self.dataType_group.setStyleSheet('color: black')
+        self.dark_button.setStyleSheet('color: black')
+        self.air_button.setStyleSheet('color: black')
+        if len(self.raw_edit.text()) > 0:
+            self.raw_button.setStyleSheet('color: black')
+        else:
+            self.raw_button.setStyleSheet('color: red')
         
     def browse_path_Clicked(self):
         openArchdirDialog = QFileDialog()

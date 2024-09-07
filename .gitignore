@@ -9,6 +9,7 @@ demo/sample_data/*.tif
 demo/sample_data/*.txt
 LTT.log
 dictionary_utils.py
+leapctserver_defaults.txt
 
 # temporary files
 *.bak

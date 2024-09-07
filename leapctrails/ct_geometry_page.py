@@ -76,65 +76,68 @@ class CTgeometryPage(QWidget):
         systemSpecifications_group = QGroupBox("System Specifications")
         systemSpecifications_grid = QGridLayout()
         
-        sod_label = QLabel("<div align='right'>sod (mm)</div>")
+        self.sod_label = QLabel("<div align='right'>sod (mm)</div>")
         self.sod_edit = QLineEdit()
-        sod_label.setToolTip("source to object distance, measured in mm; this can also be viewed as the source to center of rotation distance")
-        systemSpecifications_grid.addWidget(sod_label, 0, 0)
+        self.sod_label.setToolTip("source to object distance, measured in mm; this can also be viewed as the source to center of rotation distance")
+        systemSpecifications_grid.addWidget(self.sod_label, 0, 0)
         systemSpecifications_grid.addWidget(self.sod_edit, 0, 1)
         
-        numRows_label = QLabel("<div align='right'>num rows</div>")
+        self.numRows_label = QLabel("<div align='right'>num rows</div>")
         self.numRows_edit = QLineEdit()
-        numRows_label.setToolTip("number of rows in the x-ray detector")
-        systemSpecifications_grid.addWidget(numRows_label, 1, 0)
+        self.numRows_label.setToolTip("number of rows in the x-ray detector")
+        systemSpecifications_grid.addWidget(self.numRows_label, 1, 0)
         systemSpecifications_grid.addWidget(self.numRows_edit, 1, 1)
         
-        pixelHeight_label = QLabel("<div align='right'>pixel height (mm)</div>")
+        self.pixelHeight_label = QLabel("<div align='right'>pixel height (mm)</div>")
         self.pixelHeight_edit = QLineEdit()
-        pixelHeight_label.setToolTip("the detector pixel pitch (i.e., pixel size) between detector rows, measured in mm")
-        systemSpecifications_grid.addWidget(pixelHeight_label, 2, 0)
+        self.pixelHeight_label.setToolTip("the detector pixel pitch (i.e., pixel size) between detector rows, measured in mm")
+        systemSpecifications_grid.addWidget(self.pixelHeight_label, 2, 0)
         systemSpecifications_grid.addWidget(self.pixelHeight_edit, 2, 1)
         
-        centerRow_label = QLabel("<div align='right'>center row</div>")
+        self.centerRow_label = QLabel("<div align='right'>center row</div>")
         self.centerRow_edit = QLineEdit()
-        centerRow_label.setToolTip("the detector pixel row index for the ray that passes from the source, through the origin, and hits the detector")
-        systemSpecifications_grid.addWidget(centerRow_label, 3, 0)
+        self.centerRow_label.setToolTip("the detector pixel row index for the ray that passes from the source, through the origin, and hits the detector")
+        systemSpecifications_grid.addWidget(self.centerRow_label, 3, 0)
         systemSpecifications_grid.addWidget(self.centerRow_edit, 3, 1)
         
-        tau_label = QLabel("<div align='right'>tau (mm)</div>")
+        self.tau_label = QLabel("<div align='right'>tau (mm)</div>")
         self.tau_edit = QLineEdit()
-        tau_label.setToolTip("center of rotation offset, measured in mm")
-        systemSpecifications_grid.addWidget(tau_label, 4, 0)
+        self.tau_label.setToolTip("center of rotation offset, measured in mm")
+        systemSpecifications_grid.addWidget(self.tau_label, 4, 0)
         systemSpecifications_grid.addWidget(self.tau_edit, 4, 1)
         
-        sdd_label = QLabel("<div align='right'>sdd (mm)</div>")
+        self.sdd_label = QLabel("<div align='right'>sdd (mm)</div>")
         self.sdd_edit = QLineEdit()
-        sdd_label.setToolTip("source to detector distance, measured in mm")
-        systemSpecifications_grid.addWidget(sdd_label, 0, 2)
+        self.sdd_label.setToolTip("source to detector distance, measured in mm")
+        systemSpecifications_grid.addWidget(self.sdd_label, 0, 2)
         systemSpecifications_grid.addWidget(self.sdd_edit, 0, 3)
         
-        numCols_label = QLabel("<div align='right'>num columns</div>")
+        self.numCols_label = QLabel("<div align='right'>num columns</div>")
         self.numCols_edit = QLineEdit()
-        numCols_label.setToolTip("number of columns in the x-ray detector")
-        systemSpecifications_grid.addWidget(numCols_label, 1, 2)
+        self.numCols_label.setToolTip("number of columns in the x-ray detector")
+        systemSpecifications_grid.addWidget(self.numCols_label, 1, 2)
         systemSpecifications_grid.addWidget(self.numCols_edit, 1, 3)
         
-        pixelWidth_label = QLabel("<div align='right'>pixel width (mm)</div>")
+        self.pixelWidth_label = QLabel("<div align='right'>pixel width (mm)</div>")
         self.pixelWidth_edit = QLineEdit()
-        pixelWidth_label.setToolTip("the detector pixel pitch (i.e., pixel size) between detector columns, measured in mm")
-        systemSpecifications_grid.addWidget(pixelWidth_label, 2, 2)
+        self.pixelWidth_label.setToolTip("the detector pixel pitch (i.e., pixel size) between detector columns, measured in mm")
+        systemSpecifications_grid.addWidget(self.pixelWidth_label, 2, 2)
         systemSpecifications_grid.addWidget(self.pixelWidth_edit, 2, 3)
         
-        centerCol_label = QLabel("<div align='right'>center column</div>")
+        self.centerCol_label = QLabel("<div align='right'>center column</div>")
         self.centerCol_edit = QLineEdit()
-        centerCol_label.setToolTip("the detector pixel column index for the ray that passes from the source, through the origin, and hits the detector")
-        systemSpecifications_grid.addWidget(centerCol_label, 3, 2)
+        self.centerCol_label.setToolTip("the detector pixel column index for the ray that passes from the source, through the origin, and hits the detector")
+        systemSpecifications_grid.addWidget(self.centerCol_label, 3, 2)
         systemSpecifications_grid.addWidget(self.centerCol_edit, 3, 3)
         
-        helicalPitch_label = QLabel("<div align='right'>helical pitch (mm/rad)</div>")
+        self.helicalPitch_label = QLabel("<div align='right'>helical pitch (mm/rad)</div>")
         self.helicalPitch_edit = QLineEdit()
-        helicalPitch_label.setToolTip("the helical pitch (mm/radians)")
-        systemSpecifications_grid.addWidget(helicalPitch_label, 4, 2)
+        self.normalizedHelicalPitch_label = QLabel()
+        self.helicalPitch_label.setToolTip("the helical pitch (mm/radians)\nhelical pitch = (normalized helical pitch) * (numRows * pixelHeight * sod / sdd) / (2 * pi)")
+        #h = h_normalized * (numRows * pixelHeight * sod / sdd) / (2.0*PI)
+        systemSpecifications_grid.addWidget(self.helicalPitch_label, 4, 2)
         systemSpecifications_grid.addWidget(self.helicalPitch_edit, 4, 3)
+        systemSpecifications_grid.addWidget(self.normalizedHelicalPitch_label, 4, 4, 1, 2)
         
         # Angles
         self.equispaced_angles_check = QCheckBox("equi-spaced angles")
@@ -143,22 +146,22 @@ class CTgeometryPage(QWidget):
         self.equispaced_angles_check.setChecked(True)
         self.equispaced_angles_check.clicked.connect(self.equispaced_angles_check_Clicked)
         
-        numAngles_label = QLabel("<div align='right'>num angles</div>")
+        self.numAngles_label = QLabel("<div align='right'>num angles</div>")
         self.numAngles_edit = QLineEdit()
-        numAngles_label.setToolTip("number of projection angles")
-        systemSpecifications_grid.addWidget(numAngles_label, 1, 4)
+        self.numAngles_label.setToolTip("number of projection angles")
+        systemSpecifications_grid.addWidget(self.numAngles_label, 1, 4)
         systemSpecifications_grid.addWidget(self.numAngles_edit, 1, 5)
         
-        initial_angle_label = QLabel("<div align='right'>initial angle (deg)</div>")
+        self.initial_angle_label = QLabel("<div align='right'>initial angle (deg)</div>")
         self.initial_angle_edit = QLineEdit()
-        initial_angle_label.setToolTip("the angle of the first projection (in degrees)")
-        systemSpecifications_grid.addWidget(initial_angle_label, 2, 4)
+        self.initial_angle_label.setToolTip("the angle of the first projection (in degrees)")
+        systemSpecifications_grid.addWidget(self.initial_angle_label, 2, 4)
         systemSpecifications_grid.addWidget(self.initial_angle_edit, 2, 5)
         
-        angular_range_label = QLabel("<div align='right'>angular range (deg)</div>")
+        self.angular_range_label = QLabel("<div align='right'>angular range (deg)</div>")
         self.angular_range_edit = QLineEdit()
-        angular_range_label.setToolTip("the angular range of all projections (degrees), i.e., numAngles * angularStep; negative numbers model a reverse direction rotation")
-        systemSpecifications_grid.addWidget(angular_range_label, 3, 4)
+        self.angular_range_label.setToolTip("the angular range of all projections (degrees), i.e., numAngles * angularStep; negative numbers model a reverse direction rotation")
+        systemSpecifications_grid.addWidget(self.angular_range_label, 3, 4)
         systemSpecifications_grid.addWidget(self.angular_range_edit, 3, 5)
         
         #self.rotation_direction_button = QPushButton("Counter Clockwise Rotation")
@@ -174,10 +177,16 @@ class CTgeometryPage(QWidget):
         self.truncatedScan_check = QCheckBox("truncated scan")
         self.offsetScan_check.clicked.connect(self.offsetScan_check_Clicked)
         self.truncatedScan_check.clicked.connect(self.truncatedScan_check_Clicked)
+        self.sketch_system_button = QPushButton("sketch system")
+        self.sketch_system_button.clicked.connect(self.sketch_system_button_Clicked)
         scan_type_layout.addWidget(self.offsetScan_check)
         scan_type_layout.addWidget(self.truncatedScan_check)
+        blank_label = QLabel("             ")
+        scan_type_layout.addWidget(blank_label)
+        scan_type_layout.addWidget(self.sketch_system_button)
         overall_grid.addLayout(scan_type_layout, 3, 0, 1, 1)
         ######### SCAN TYPE END #########
+        
         
         self.sod_edit.editingFinished.connect(self.push_sod)
         self.numRows_edit.editingFinished.connect(self.push_numRows)
@@ -236,9 +245,70 @@ class CTgeometryPage(QWidget):
             self.equispaced_angles_check.setChecked(False)
         self.numAngles_edit.setText(str(self.leapct.get_numAngles()))
         self.equispaced_angles_check_Clicked()
+        self.set_text_color()
+        self.enable_disable()
         
         #self.offsetScan_check.setChecked(self.get_offsetScan())
         #self.truncatedScan_check.setChecked(self.get_truncatedScan())
+        
+    def set_text_color(self):
+        if self.cone_flat_radio.isChecked() or self.cone_curved_radio.isChecked() or self.cone_parallel_radio.isChecked():
+            if self.leapct.get_sod() > 0.0:
+               self.sod_label.setStyleSheet('color: black')
+            else:
+               self.sod_label.setStyleSheet('color: red')
+            if self.leapct.get_sdd() > 0.0:
+               self.sdd_label.setStyleSheet('color: black')
+            else:
+               self.sdd_label.setStyleSheet('color: red')
+        elif self.modular_radio.isChecked():
+            self.sod_label.setStyleSheet('color: black')
+            self.sdd_label.setStyleSheet('color: black')
+        elif self.fan_radio.isChecked():
+            if self.leapct.get_sod() > 0.0:
+               self.sod_label.setStyleSheet('color: black')
+            else:
+               self.sod_label.setStyleSheet('color: red')
+            if self.leapct.get_sdd() > 0.0:
+               self.sdd_label.setStyleSheet('color: black')
+            else:
+               self.sdd_label.setStyleSheet('color: red')
+        elif self.parallel_radio.isChecked():
+            self.sod_label.setStyleSheet('color: black')
+            self.sdd_label.setStyleSheet('color: black')
+        else:
+            self.sod_label.setStyleSheet('color: black')
+            self.sdd_label.setStyleSheet('color: black')
+            
+        if self.leapct.get_numAngles() > 0:
+            self.numAngles_label.setStyleSheet('color: black')
+        else:
+            self.numAngles_label.setStyleSheet('color: red')
+        if self.leapct.get_numRows() > 0:
+            self.numRows_label.setStyleSheet('color: black')
+        else:
+            self.numRows_label.setStyleSheet('color: red')
+        if self.leapct.get_numCols() > 0:
+            self.numCols_label.setStyleSheet('color: black')
+        else:
+            self.numCols_label.setStyleSheet('color: red')
+        if self.leapct.get_pixelWidth() > 0:
+            self.pixelWidth_label.setStyleSheet('color: black')
+        else:
+            self.pixelWidth_label.setStyleSheet('color: red')
+        if self.leapct.get_pixelHeight() > 0:
+            self.pixelHeight_label.setStyleSheet('color: black')
+        else:
+            self.pixelHeight_label.setStyleSheet('color: red')
+            
+        if self.leapct.ct_geometry_defined():
+            self.sketch_system_button.setEnabled(True)
+        else:
+            self.sketch_system_button.setEnabled(False)
+    
+    def sketch_system_button_Clicked(self):
+        if self.leapct.ct_geometry_defined():
+            self.leapct.sketch_system(0)        
         
     def pushAllParameters(self):
         pass
@@ -306,6 +376,7 @@ class CTgeometryPage(QWidget):
             except:
                 self.numAngles_edit.setText("")
                 self.leapct.set_numAngles(0)
+        self.set_text_color()
     
     def push_angularRange(self):
         numAngles = self.leapct.get_numAngles()
@@ -331,6 +402,7 @@ class CTgeometryPage(QWidget):
             except:
                 self.leapct.set_sod(0.0)
                 self.sod_edit.setText("")
+        self.set_text_color()
         
     def push_numRows(self):
         if len(self.numRows_edit.text()) == 0:
@@ -342,6 +414,7 @@ class CTgeometryPage(QWidget):
             except:
                 self.leapct.set_numRows(0)
                 self.numRows_edit.setText("")
+        self.set_text_color()
         
     def push_pixelHeight(self):
         if len(self.pixelHeight_edit.text()) == 0:
@@ -353,6 +426,7 @@ class CTgeometryPage(QWidget):
             except:
                 self.leapct.set_pixelHeight(0.0)
                 self.pixelHeight_edit.setText("")
+        self.set_text_color()
         
     def push_centerRow(self):
         if len(self.centerRow_edit.text()) == 0:
@@ -386,6 +460,7 @@ class CTgeometryPage(QWidget):
             except:
                 self.sdd_edit.setText("")
                 self.leapct.set_sdd(0.0)
+        self.set_text_color()
         
     def push_numCols(self):
         if len(self.numCols_edit.text()) == 0:
@@ -397,6 +472,7 @@ class CTgeometryPage(QWidget):
             except:
                 self.numCols_edit.setText("")
                 self.leapct.set_numCols(0)
+        self.set_text_color()
         
     def push_pixelWidth(self):
         if len(self.pixelWidth_edit.text()) == 0:
@@ -408,6 +484,7 @@ class CTgeometryPage(QWidget):
             except:
                 self.pixelWidth_edit.setText("")
                 self.leapct.set_pixelWidth(0.0)
+        self.set_text_color()
         
     def push_centerCol(self):
         if len(self.centerCol_edit.text()) == 0:
@@ -430,32 +507,43 @@ class CTgeometryPage(QWidget):
             except:
                 self.helicalPitch_edit.setText("")
                 self.leapct.set_helicalPitch(0.0)
+        if self.leapct.get_helicalPitch() != 0.0 and self.leapct.get_numRows() > 0 and self.leapct.get_pixelHeight() > 0.0 and self.leapct.get_sod() > 0.0 and self.leapct.get_sdd() > 0.0:
+            text = str(f'{self.leapct.get_normalizedHelicalPitch():.4f}')
+            self.normalizedHelicalPitch_label.setText('normalized pitch = ' + str(text))
+        else:
+            self.normalizedHelicalPitch_label.setText("")
         
     def cone_flat_radio_Clicked(self):
         self.leapct.set_geometry('CONE')
         self.leapct.set_flatDetector()
         self.enable_disable()
+        self.set_text_color()
         
     def cone_curved_radio_Clicked(self):
         self.leapct.set_geometry('CONE')
         self.leapct.set_curvedDetector()
         self.enable_disable()
+        self.set_text_color()
         
     def modular_radio_Clicked(self):
         self.leapct.set_geometry('MODULAR')
         self.enable_disable()
+        self.set_text_color()
         
     def cone_parallel_radio_Clicked(self):
         self.leapct.set_geometry('CONE-PARALLEL')
         self.enable_disable()
+        self.set_text_color()
     
     def fan_radio_Clicked(self):
         self.leapct.set_geometry('FAN')
         self.enable_disable()
+        self.set_text_color()
         
     def parallel_radio_Clicked(self):
         self.leapct.set_geometry('PARALLEL')
         self.enable_disable()
+        self.set_text_color()
         
     def enable_disable(self):
         geom = self.leapct.get_geometry()

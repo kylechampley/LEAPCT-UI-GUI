@@ -17,6 +17,8 @@ application = QApplication(sys.argv)
 mainWindow = mw.leapctrails(lctserver)
 #mainWindow.placeHolderWindow.resize(1000,1000)
 
+#run(max_loop_level=2)
+
 """ Set Icon
 icon = QIcon(os.path.join(os.path.dirname(os.path.realpath(__file__)), "LEAPicon.png"))
 application.setWindowIcon(icon)
