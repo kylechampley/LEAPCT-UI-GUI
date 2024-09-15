@@ -74,105 +74,127 @@ class CTgeometryPage(QWidget):
         
         ######### SYSTEM SPECIFICATIONS START #########
         systemSpecifications_group = QGroupBox("System Specifications")
-        systemSpecifications_grid = QGridLayout()
+        self.systemSpecifications_grid = QGridLayout()
         
         self.sod_label = QLabel("<div align='right'>sod (mm)</div>")
         self.sod_edit = QLineEdit()
         self.sod_label.setToolTip("source to object distance, measured in mm; this can also be viewed as the source to center of rotation distance")
-        systemSpecifications_grid.addWidget(self.sod_label, 0, 0)
-        systemSpecifications_grid.addWidget(self.sod_edit, 0, 1)
+        self.systemSpecifications_grid.addWidget(self.sod_label, 0, 0)
+        self.systemSpecifications_grid.addWidget(self.sod_edit, 0, 1)
         
         self.numRows_label = QLabel("<div align='right'>num rows</div>")
         self.numRows_edit = QLineEdit()
         self.numRows_label.setToolTip("number of rows in the x-ray detector")
-        systemSpecifications_grid.addWidget(self.numRows_label, 1, 0)
-        systemSpecifications_grid.addWidget(self.numRows_edit, 1, 1)
+        self.systemSpecifications_grid.addWidget(self.numRows_label, 1, 0)
+        self.systemSpecifications_grid.addWidget(self.numRows_edit, 1, 1)
         
         self.pixelHeight_label = QLabel("<div align='right'>pixel height (mm)</div>")
         self.pixelHeight_edit = QLineEdit()
         self.pixelHeight_label.setToolTip("the detector pixel pitch (i.e., pixel size) between detector rows, measured in mm")
-        systemSpecifications_grid.addWidget(self.pixelHeight_label, 2, 0)
-        systemSpecifications_grid.addWidget(self.pixelHeight_edit, 2, 1)
+        self.systemSpecifications_grid.addWidget(self.pixelHeight_label, 2, 0)
+        self.systemSpecifications_grid.addWidget(self.pixelHeight_edit, 2, 1)
         
         self.centerRow_label = QLabel("<div align='right'>center row</div>")
         self.centerRow_edit = QLineEdit()
         self.centerRow_label.setToolTip("the detector pixel row index for the ray that passes from the source, through the origin, and hits the detector")
-        systemSpecifications_grid.addWidget(self.centerRow_label, 3, 0)
-        systemSpecifications_grid.addWidget(self.centerRow_edit, 3, 1)
+        self.shift_detector_row_button = QPushButton("vertical shift (mm)")
+        self.centerRow_stack = QStackedWidget()
+        self.centerRow_stack.addWidget(self.centerRow_label)
+        self.centerRow_stack.addWidget(self.shift_detector_row_button)
+        #self.systemSpecifications_grid.addWidget(self.centerRow_label, 3, 0)
+        self.systemSpecifications_grid.addWidget(self.centerRow_stack, 3, 0)
+        self.systemSpecifications_grid.addWidget(self.centerRow_edit, 3, 1)
         
         self.tau_label = QLabel("<div align='right'>tau (mm)</div>")
         self.tau_edit = QLineEdit()
         self.tau_label.setToolTip("center of rotation offset, measured in mm")
-        systemSpecifications_grid.addWidget(self.tau_label, 4, 0)
-        systemSpecifications_grid.addWidget(self.tau_edit, 4, 1)
+        self.systemSpecifications_grid.addWidget(self.tau_label, 4, 0)
+        self.systemSpecifications_grid.addWidget(self.tau_edit, 4, 1)
         
         self.sdd_label = QLabel("<div align='right'>sdd (mm)</div>")
         self.sdd_edit = QLineEdit()
         self.sdd_label.setToolTip("source to detector distance, measured in mm")
-        systemSpecifications_grid.addWidget(self.sdd_label, 0, 2)
-        systemSpecifications_grid.addWidget(self.sdd_edit, 0, 3)
+        self.systemSpecifications_grid.addWidget(self.sdd_label, 0, 2)
+        self.systemSpecifications_grid.addWidget(self.sdd_edit, 0, 3)
         
         self.numCols_label = QLabel("<div align='right'>num columns</div>")
         self.numCols_edit = QLineEdit()
         self.numCols_label.setToolTip("number of columns in the x-ray detector")
-        systemSpecifications_grid.addWidget(self.numCols_label, 1, 2)
-        systemSpecifications_grid.addWidget(self.numCols_edit, 1, 3)
+        self.systemSpecifications_grid.addWidget(self.numCols_label, 1, 2)
+        self.systemSpecifications_grid.addWidget(self.numCols_edit, 1, 3)
         
         self.pixelWidth_label = QLabel("<div align='right'>pixel width (mm)</div>")
         self.pixelWidth_edit = QLineEdit()
         self.pixelWidth_label.setToolTip("the detector pixel pitch (i.e., pixel size) between detector columns, measured in mm")
-        systemSpecifications_grid.addWidget(self.pixelWidth_label, 2, 2)
-        systemSpecifications_grid.addWidget(self.pixelWidth_edit, 2, 3)
+        self.systemSpecifications_grid.addWidget(self.pixelWidth_label, 2, 2)
+        self.systemSpecifications_grid.addWidget(self.pixelWidth_edit, 2, 3)
         
         self.centerCol_label = QLabel("<div align='right'>center column</div>")
         self.centerCol_edit = QLineEdit()
         self.centerCol_label.setToolTip("the detector pixel column index for the ray that passes from the source, through the origin, and hits the detector")
-        systemSpecifications_grid.addWidget(self.centerCol_label, 3, 2)
-        systemSpecifications_grid.addWidget(self.centerCol_edit, 3, 3)
+        self.shift_detector_col_button = QPushButton("horizontal shift (mm)")
+        self.centerCol_stack = QStackedWidget()
+        self.centerCol_stack.addWidget(self.centerCol_label)
+        self.centerCol_stack.addWidget(self.shift_detector_col_button)
+        self.systemSpecifications_grid.addWidget(self.centerCol_stack, 3, 2)
+        self.systemSpecifications_grid.addWidget(self.centerCol_edit, 3, 3)
         
         self.helicalPitch_label = QLabel("<div align='right'>helical pitch (mm/rad)</div>")
         self.helicalPitch_edit = QLineEdit()
         self.normalizedHelicalPitch_label = QLabel()
         self.helicalPitch_label.setToolTip("the helical pitch (mm/radians)\nhelical pitch = (normalized helical pitch) * (numRows * pixelHeight * sod / sdd) / (2 * pi)")
         #h = h_normalized * (numRows * pixelHeight * sod / sdd) / (2.0*PI)
-        systemSpecifications_grid.addWidget(self.helicalPitch_label, 4, 2)
-        systemSpecifications_grid.addWidget(self.helicalPitch_edit, 4, 3)
-        systemSpecifications_grid.addWidget(self.normalizedHelicalPitch_label, 4, 4, 1, 2)
+        self.systemSpecifications_grid.addWidget(self.helicalPitch_label, 4, 2)
+        self.systemSpecifications_grid.addWidget(self.helicalPitch_edit, 4, 3)
+        self.systemSpecifications_grid.addWidget(self.normalizedHelicalPitch_label, 4, 4, 1, 2)
         
         # Angles
         self.equispaced_angles_check = QCheckBox("equi-spaced angles")
         self.equispaced_angles_check.setToolTip("if the projection angles are non-equi-spaced, you must set them with a geometry file")
-        systemSpecifications_grid.addWidget(self.equispaced_angles_check, 0, 4, 1, 2)
+        self.systemSpecifications_grid.addWidget(self.equispaced_angles_check, 0, 4, 1, 2)
         self.equispaced_angles_check.setChecked(True)
         self.equispaced_angles_check.clicked.connect(self.equispaced_angles_check_Clicked)
         
         self.numAngles_label = QLabel("<div align='right'>num angles</div>")
         self.numAngles_edit = QLineEdit()
         self.numAngles_label.setToolTip("number of projection angles")
-        systemSpecifications_grid.addWidget(self.numAngles_label, 1, 4)
-        systemSpecifications_grid.addWidget(self.numAngles_edit, 1, 5)
+        self.systemSpecifications_grid.addWidget(self.numAngles_label, 1, 4)
+        self.systemSpecifications_grid.addWidget(self.numAngles_edit, 1, 5)
         
         self.initial_angle_label = QLabel("<div align='right'>initial angle (deg)</div>")
         self.initial_angle_edit = QLineEdit()
         self.initial_angle_label.setToolTip("the angle of the first projection (in degrees)")
-        systemSpecifications_grid.addWidget(self.initial_angle_label, 2, 4)
-        systemSpecifications_grid.addWidget(self.initial_angle_edit, 2, 5)
+        self.systemSpecifications_grid.addWidget(self.initial_angle_label, 2, 4)
+        self.systemSpecifications_grid.addWidget(self.initial_angle_edit, 2, 5)
         
         self.angular_range_label = QLabel("<div align='right'>angular range (deg)</div>")
         self.angular_range_edit = QLineEdit()
         self.angular_range_label.setToolTip("the angular range of all projections (degrees), i.e., numAngles * angularStep; negative numbers model a reverse direction rotation")
-        systemSpecifications_grid.addWidget(self.angular_range_label, 3, 4)
-        systemSpecifications_grid.addWidget(self.angular_range_edit, 3, 5)
+        self.systemSpecifications_grid.addWidget(self.angular_range_label, 3, 4)
+        self.systemSpecifications_grid.addWidget(self.angular_range_edit, 3, 5)
         
         #self.rotation_direction_button = QPushButton("Counter Clockwise Rotation")
-        #systemSpecifications_grid.addWidget(self.rotation_direction_button, 4, 4, 1, 2)
+        #self.systemSpecifications_grid.addWidget(self.rotation_direction_button, 4, 4, 1, 2)
         
-        systemSpecifications_group.setLayout(systemSpecifications_grid)
+        systemSpecifications_group.setLayout(self.systemSpecifications_grid)
         overall_grid.addWidget(systemSpecifications_group, 2, 0, 1, 4)
         ######### SYSTEM SPECIFICATIONS END #########
         
+        """
+        shift_group = QGroupBox()
+        shift_layout = QHBoxLayout()
+        self.shift_detector_button = QPushButton("shift detector (mm)")
+        self.shift_detector_row_edit = QLineEdit()
+        self.shift_detector_col_edit = QLineEdit()
+        shift_layout.addWidget(self.shift_detector_col_button)
+        shift_layout.addWidget(self.shift_detector_row_edit)
+        shift_layout.addWidget(self.shift_detector_col_edit)
+        shift_group.setLayout(shift_layout)
+        """
+        
         ######### SCAN TYPE START #########
         scan_type_layout = QHBoxLayout()
+        #scan_type_layout.addWidget(shift_group)
         self.offsetScan_check = QCheckBox("offset scan")
         self.truncatedScan_check = QCheckBox("truncated scan")
         self.offsetScan_check.clicked.connect(self.offsetScan_check_Clicked)
@@ -187,7 +209,8 @@ class CTgeometryPage(QWidget):
         overall_grid.addLayout(scan_type_layout, 3, 0, 1, 1)
         ######### SCAN TYPE END #########
         
-        
+        self.shift_detector_row_button.clicked.connect(self.shift_detector_row_button_Clicked)
+        self.shift_detector_col_button.clicked.connect(self.shift_detector_col_button_Clicked)
         self.sod_edit.editingFinished.connect(self.push_sod)
         self.numRows_edit.editingFinished.connect(self.push_numRows)
         self.pixelHeight_edit.editingFinished.connect(self.push_pixelHeight)
@@ -224,12 +247,18 @@ class CTgeometryPage(QWidget):
         self.sod_edit.setText(str(self.leapct.get_sod()))
         self.numRows_edit.setText(str(self.leapct.get_numRows()))
         self.pixelHeight_edit.setText(str(self.leapct.get_pixelHeight()))
-        self.centerRow_edit.setText(str(self.leapct.get_centerRow()))
+        if geomTxt == 'MODULAR':
+            self.centerRow_edit.setText("")
+        else:
+            self.centerRow_edit.setText(str(self.leapct.get_centerRow()))
         self.tau_edit.setText(str(self.leapct.get_tau()))
         self.sdd_edit.setText(str(self.leapct.get_sdd()))
         self.numCols_edit.setText(str(self.leapct.get_numCols()))
         self.pixelWidth_edit.setText(str(self.leapct.get_pixelWidth()))
-        self.centerCol_edit.setText(str(self.leapct.get_centerCol()))
+        if geomTxt == 'MODULAR':
+            self.centerCol_edit.setText("")
+        else:
+            self.centerCol_edit.setText(str(self.leapct.get_centerCol()))
         self.helicalPitch_edit.setText(str(self.leapct.get_helicalPitch()))
         
         if self.leapct.angles_are_equispaced() == True:
@@ -427,17 +456,42 @@ class CTgeometryPage(QWidget):
                 self.leapct.set_pixelHeight(0.0)
                 self.pixelHeight_edit.setText("")
         self.set_text_color()
-        
-    def push_centerRow(self):
+    
+    def shift_detector_row_button_Clicked(self):
         if len(self.centerRow_edit.text()) == 0:
-            self.leapct.set_centerRow(0.0)
+            shift = 0.0
         else:
             try:
-                x = float(self.centerRow_edit.text())
-                self.leapct.set_centerRow(x)
+                shift = float(self.centerRow_edit.text())
             except:
+                shift = 0.0
+        if shift != 0.0:
+            self.leapct.shift_detector(shift, 0.0)
+        self.centerRow_edit.setText("")
+            
+    def shift_detector_col_button_Clicked(self):
+        if len(self.centerCol_edit.text()) == 0:
+            shift = 0.0
+        else:
+            try:
+                shift = float(self.centerCol_edit.text())
+            except:
+                shift = 0.0
+        if shift != 0.0:
+            self.leapct.shift_detector(0.0, shift)
+        self.centerCol_edit.setText("")
+        
+    def push_centerRow(self):
+        if self.leapct.get_geometry() != 'MODULAR':
+            if len(self.centerRow_edit.text()) == 0:
                 self.leapct.set_centerRow(0.0)
-                self.centerRow_edit.setText("")
+            else:
+                try:
+                    x = float(self.centerRow_edit.text())
+                    self.leapct.set_centerRow(x)
+                except:
+                    self.leapct.set_centerRow(0.0)
+                    self.centerRow_edit.setText("")
         
     def push_tau(self):
         if len(self.tau_edit.text()) == 0:
@@ -487,15 +541,16 @@ class CTgeometryPage(QWidget):
         self.set_text_color()
         
     def push_centerCol(self):
-        if len(self.centerCol_edit.text()) == 0:
-            self.leapct.set_centerCol(0.0)
-        else:
-            try:
-                x = float(self.centerCol_edit.text())
-                self.leapct.set_centerCol(x)
-            except:
-                self.centerCol_edit.setText("")
+        if self.leapct.get_geometry() != 'MODULAR':
+            if len(self.centerCol_edit.text()) == 0:
                 self.leapct.set_centerCol(0.0)
+            else:
+                try:
+                    x = float(self.centerCol_edit.text())
+                    self.leapct.set_centerCol(x)
+                except:
+                    self.centerCol_edit.setText("")
+                    self.leapct.set_centerCol(0.0)
         
     def push_helicalPitch(self):
         if len(self.helicalPitch_edit.text()) == 0:
@@ -513,35 +568,49 @@ class CTgeometryPage(QWidget):
         else:
             self.normalizedHelicalPitch_label.setText("")
         
+    def update_detector_center(self):
+        if self.leapct.get_geometry() == 'MODULAR':
+            self.centerRow_edit.setText("")
+            self.centerCol_edit.setText("")
+        else:
+            self.centerRow_edit.setText(str(self.leapct.get_centerRow()))
+            self.centerCol_edit.setText(str(self.leapct.get_centerCol()))
+    
     def cone_flat_radio_Clicked(self):
         self.leapct.set_geometry('CONE')
         self.leapct.set_flatDetector()
+        self.update_detector_center()
         self.enable_disable()
         self.set_text_color()
         
     def cone_curved_radio_Clicked(self):
         self.leapct.set_geometry('CONE')
         self.leapct.set_curvedDetector()
+        self.update_detector_center()
         self.enable_disable()
         self.set_text_color()
         
     def modular_radio_Clicked(self):
         self.leapct.set_geometry('MODULAR')
+        self.update_detector_center()
         self.enable_disable()
         self.set_text_color()
         
     def cone_parallel_radio_Clicked(self):
         self.leapct.set_geometry('CONE-PARALLEL')
+        self.update_detector_center()
         self.enable_disable()
         self.set_text_color()
     
     def fan_radio_Clicked(self):
         self.leapct.set_geometry('FAN')
+        self.update_detector_center()
         self.enable_disable()
         self.set_text_color()
         
     def parallel_radio_Clicked(self):
         self.leapct.set_geometry('PARALLEL')
+        self.update_detector_center()
         self.enable_disable()
         self.set_text_color()
         
@@ -582,3 +651,11 @@ class CTgeometryPage(QWidget):
                 self.angular_range_edit.setEnabled(True)
                 self.initial_angle_edit.setEnabled(True)
             
+        if geom == 'MODULAR':
+            self.centerRow_stack.setCurrentIndex(1)
+            self.centerCol_stack.setCurrentIndex(1)
+        else:
+            self.centerRow_stack.setCurrentIndex(0)
+            self.centerCol_stack.setCurrentIndex(0)
+        
+        

@@ -795,7 +795,10 @@ class ParameterSweepParametersPage(AlgorithmParameterPage):
         number_of_samples_label = QLabel("<div align='right'>number of samples:</div>")
         window_label = QLabel("<div align='right'>window radius</div>")
         self.type_combo = QComboBox()
-        self.type_combo.addItems(["centerCol", "centerRow", "tau", "tilt"])
+        if self.leapct.get_geometry() == 'MODULAR':
+            self.type_combo.addItems(["horizontal_shift", "vertical_shift", "tau", "tilt"])
+        else:
+            self.type_combo.addItems(["centerCol", "centerRow", "tau", "tilt"])
         self.number_of_samples_combo = QComboBox()
         self.number_of_samples_combo.addItems(["3", "5", "7", "9", "11", "13", "15"])
         self.window_edit = QLineEdit("1.0")
@@ -838,6 +841,31 @@ class ParameterSweepParametersPage(AlgorithmParameterPage):
         webbrowser.open('https://leapct.readthedocs.io/en/latest/preprocessing_algorithms.html#leap_preprocessing_algorithms.parameter_sweep')
         
     def preview_button_Clicked(self):
+
+        geom_text = self.leapct.get_geometry()
+        if geom_text == 'MODULAR':
+            self.type_combo.setItemText(0, 'horizontal_shift')
+            self.type_combo.setItemText(1, 'vertical_shift')
+        else:
+            self.type_combo.setItemText(0, 'centerCol')
+            self.type_combo.setItemText(1, 'centerRow')
+    
+        
+        type_text = self.type_combo.currentText()
+        """
+        geom_text = self.leapct.get_geometry()
+        if geom_text == 'MODULAR':
+            if type_text == 'centerCol':
+                type_text = 'horizontal_shift'
+            elif type_text == 'centerRow':
+                type_text = 'vertical_shift'
+        else:
+            if type_text == 'horizontal_shift':
+                type_text = 'centerCol'
+            elif type_text == 'vertical_shift':
+                type_text = 'centerRow'
+        """
+    
         if self.parent.runningPreviousAlgorithms == False:
             self.parent.runPreviousAlgorithms()
 
@@ -860,11 +888,11 @@ class ParameterSweepParametersPage(AlgorithmParameterPage):
             window_radius = 0.5*(count-1)
             
         values = (np.array(range(count))-0.5*(count-1)) * window_radius / (0.5*(count-1))
-        if self.type_combo.currentText() == 'centerCol':
+        if type_text == 'centerCol':
             values += self.leapct.get_centerCol()
-        elif self.type_combo.currentText() == 'centerRow':
+        elif type_text == 'centerRow':
             values += self.leapct.get_centerRow()
-        elif self.type_combo.currentText() == 'tau':
+        elif type_text == 'tau':
             values += self.leapct.get_tau()
         
         """
@@ -874,7 +902,7 @@ class ParameterSweepParametersPage(AlgorithmParameterPage):
         progressDialog.show()
         """
         
-        self.lctserver.parameter_sweep(values, param=self.type_combo.currentText(), iz=ind, algorithmName=self.algorithm_combo.currentText())
+        self.lctserver.parameter_sweep(values, param=type_text, iz=ind, algorithmName=self.algorithm_combo.currentText())
         
         #progressDialog.close()
         #QApplication.restoreOverrideCursor()

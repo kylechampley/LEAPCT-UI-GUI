@@ -269,6 +269,8 @@ class leapctserver:
                 print('To install this package do: pip install pynrrd')
                 return False
         elif fullPath.endswith('.tif') or fullPath.endswith('.tiff'):
+            return self.leapct.save_tif(fullPath, x)
+            """
             try:
                 #from PIL import Image
                 import imageio
@@ -282,6 +284,7 @@ class leapctserver:
                 print('Error: Failed to load imageio library!')
                 print('To install PIL do: pip install imageio')
                 return False
+            """
         else:
             print('Error: must be a tif, npy, or nrrd file!')
             return False
@@ -2820,7 +2823,7 @@ class leapctserver:
             self.air_scan_file = "57363.766"
             self.data_type = self.RAW_DARK_SUBTRACTED
             self.leapct.set_centerCol((self.leapct.get_numCols()-1)/2.0)
-            self.leapct.set_centerRow(self.leapct.get_numRows()-1-(self.leapct.get_numRows()-1)/2.0)
+            self.leapct.set_centerRow(self.leapct.get_numRows()-1-self.leapct.get_centerRow())
             self.takeoff_angle = 38.0
             self.set_detector_response('Gd2O2S', 7.32e-3, 0.02)
         else:

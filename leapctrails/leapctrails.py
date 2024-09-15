@@ -64,8 +64,8 @@ class leapctrails(QMainWindow):
         self.workflowWindow.refreshAllPages()
         
     def verify_version(self):
-        versionText_min = "1.21"
-        versionNumberHash_min = 1*10000 + 21*100 + 0
+        versionText_min = "1.22"
+        versionNumberHash_min = 1*10000 + 22*100 + 0
     
         versionText = self.leapct.version()
         if versionText == "unknown":
