@@ -15,7 +15,6 @@ class CTalgorithmControlsPage(QWidget):
         # Instantiate the overall grid layout:
         overall_layout = QGridLayout()
         
-        #self.algorithmSequenceList = CTalgorithmSeqeunceControlsPage(self)
         self.algorithmSequenceList = QListWidget(self)
         self.algorithmSequenceList.currentItemChanged.connect(self.onCurrentItemChanged)
         self.algorithmSequencePages = []
@@ -23,6 +22,22 @@ class CTalgorithmControlsPage(QWidget):
         button_layout = QHBoxLayout()
         self.algorithm_list_combo = QComboBox()
         self.algorithm_list_combo.addItem("Select...")
+        all_algorithms = ['Make Attenuation Radiographs',
+                          'Crop Projections',
+                          'Outlier Correction',
+                          'Find centerCol',
+                          'Detector Tilt',
+                          'Ring Removal',
+                          'Beam Hardening Correction',
+                          'Parameter Sweep',
+                          'Save Projection Data',
+                          'Tight Volume',
+                          'FBP',
+                          'Median Filter',
+                          'TV Denoising',
+                          'Save Volume Data']
+        self.algorithm_list_combo.addItems(all_algorithms)
+        """                  
         self.algorithm_list_combo.addItem("Make Attenuation Radiographs")
         self.algorithm_list_combo.addItem("Crop Projections")
         self.algorithm_list_combo.addItem("Outlier Correction")
@@ -32,9 +47,12 @@ class CTalgorithmControlsPage(QWidget):
         self.algorithm_list_combo.addItem("Beam Hardening Correction")
         self.algorithm_list_combo.addItem("Parameter Sweep")
         self.algorithm_list_combo.addItem("Save Projection Data")
+        self.algorithm_list_combo.addItem("Tight Volume")
         self.algorithm_list_combo.addItem("FBP")
         self.algorithm_list_combo.addItem("Median Filter")
         self.algorithm_list_combo.addItem("TV Denoising")
+        self.algorithm_list_combo.addItem("Save Volume Data")
+        """
         self.add_algorithm_button = QPushButton("Add")
         self.remove_algorithm_button = QPushButton("Remove")
         button_layout.addWidget(self.algorithm_list_combo)
@@ -64,21 +82,18 @@ class CTalgorithmControlsPage(QWidget):
     def refresh(self):
         if len(self.algorithmSequencePages) == 0 and self.lctserver.data_type != self.lctserver.ATTENUATION:
             if self.leapct.ct_geometry_defined():
-                self.algorithm_list_combo.setCurrentIndex(1)
-                self.add_algorithm_button_Clicked()
-                self.algorithm_list_combo.setCurrentIndex(3)
-                self.add_algorithm_button_Clicked()
-                self.algorithm_list_combo.setCurrentIndex(4)
-                self.add_algorithm_button_Clicked()
-                self.algorithm_list_combo.setCurrentIndex(6)
-                self.add_algorithm_button_Clicked()
-                
-                self.algorithm_list_combo.setCurrentIndex(7)
-                self.add_algorithm_button_Clicked()
-                
-                if self.leapct.ct_volume_defined():
-                    self.algorithm_list_combo.setCurrentIndex(10)
-                    self.add_algorithm_button_Clicked()
+                if self.lctserver.default_algorithms is not None and len(self.lctserver.default_algorithms) > 0:
+                    for n in range(len(self.lctserver.default_algorithms)):
+                        self.add_algorithm_by_text(self.lctserver.default_algorithms[n])
+                else:
+                    self.add_algorithm_by_text("Make Attenuation Radiographs")
+                    self.add_algorithm_by_text("Outlier Correction")
+                    self.add_algorithm_by_text("Find centerCol")
+                    self.add_algorithm_by_text("Ring Removal")
+                    self.add_algorithm_by_text("Beam Hardening Correction")
+                    
+                    if self.leapct.ct_volume_defined():
+                        self.add_algorithm_by_text("FBP")
     
     def runPreviousAlgorithms(self):
         retVal = True
@@ -99,7 +114,68 @@ class CTalgorithmControlsPage(QWidget):
     
     def add_algorithm_button_Clicked(self):
         self.add_algorithm(self.algorithm_list_combo.currentIndex())
-    
+
+    def add_algorithm(self, algIndex):
+        algText = self.algorithm_list_combo.itemText(algIndex)
+        self.add_algorithm_by_text(algText)
+
+    def add_algorithm_by_text(self, algText):
+        
+        if algText == "Make Attenuation Radiographs":
+            newAlgorithmPage = MakeAttenuationRadiographsParametersPage(self)
+        elif algText == "Crop Projections":
+            newAlgorithmPage = CropProjectionsParametersPage(self)
+        elif algText == "Outlier Correction":
+            newAlgorithmPage = OutlierCorrectionParametersPage(self)
+        elif algText == "Find centerCol":
+            newAlgorithmPage = FindCenterColParametersPage(self)
+        elif algText == "Detector Tilt":
+            newAlgorithmPage = EstimateDetectorTiltParametersPage(self)
+        elif algText == "Ring Removal":
+            newAlgorithmPage = RingRemovalParametersPage(self)
+        elif algText == "Beam Hardening Correction":
+            newAlgorithmPage = BeamHardeningCorrectionParametersPage(self)
+        elif algText == "Parameter Sweep":
+            newAlgorithmPage = ParameterSweepParametersPage(self)
+        elif algText == "Save Projection Data":
+            newAlgorithmPage = SaveProjectionDataParametersPage(self)
+        elif algText == "Tight Volume":
+            newAlgorithmPage = TightVolumeParametersPage(self)
+        elif algText == "FBP":
+            newAlgorithmPage = FBPParametersPage(self)
+        elif algText == "Median Filter":
+            newAlgorithmPage = MedianFilterParametersPage(self)
+        elif algText == "TV Denoising":
+            newAlgorithmPage = TVdenoisingParametersPage(self)
+        elif algText == "Save Volume Data":
+            newAlgorithmPage = SaveVolumeDataParametersPage(self)
+        else:
+            return
+        
+        ind = self.algorithmSequenceList.currentRow()
+        if len(self.algorithmSequencePages) == 0 or ind == len(self.algorithmSequencePages)-1:
+            ind = -1
+        if ind >= 0:
+            if self.check_any_computed_after(ind):
+                ind = -1
+        
+        if ind >= 0:
+            ind += 1
+            self.algorithmSequenceList.insertItem(ind, algText)
+        else:
+            self.algorithmSequenceList.addItem(algText)
+            
+        if ind >= 0:
+            self.algorithmStack.insertWidget(ind, newAlgorithmPage)
+            self.algorithmSequencePages.insert(ind, newAlgorithmPage)
+            self.algorithmSequenceList.setCurrentRow(ind)
+            #self.algorithmSequenceList.setCurrentRow(len(self.algorithmSequencePages)-1)
+        else:
+            self.algorithmStack.addWidget(newAlgorithmPage)
+            self.algorithmSequencePages.append(newAlgorithmPage)
+            self.algorithmSequenceList.setCurrentRow(len(self.algorithmSequencePages)-1)
+        
+    """
     def add_algorithm(self, algIndex):
         ind = self.algorithmSequenceList.currentRow()
         if len(self.algorithmSequencePages) == 0 or ind == len(self.algorithmSequencePages)-1:
@@ -111,10 +187,13 @@ class CTalgorithmControlsPage(QWidget):
         if algIndex > 0:
             #self.algorithmSequenceList.addItem(self.algorithm_list_combo.currentText())
             if ind >= 0:
+                ind += 1
                 self.algorithmSequenceList.insertItem(ind, self.algorithm_list_combo.currentText())
             else:
                 self.algorithmSequenceList.addItem(self.algorithm_list_combo.currentText())
             
+            algText = self.algorithm_list_combo.itemText(algIndex)
+
             if algIndex == 1:
                 newAlgorithmPage = MakeAttenuationRadiographsParametersPage(self)
             elif algIndex == 2:
@@ -134,11 +213,15 @@ class CTalgorithmControlsPage(QWidget):
             elif algIndex == 9:
                 newAlgorithmPage = SaveProjectionDataParametersPage(self)
             elif algIndex == 10:
-                newAlgorithmPage = FBPParametersPage(self)
+                newAlgorithmPage = TightVolumeParametersPage(self)
             elif algIndex == 11:
-                newAlgorithmPage = MedianFilterParametersPage(self)
+                newAlgorithmPage = FBPParametersPage(self)
             elif algIndex == 12:
+                newAlgorithmPage = MedianFilterParametersPage(self)
+            elif algIndex == 13:
                 newAlgorithmPage = TVdenoisingParametersPage(self)
+            elif algIndex == 14:
+                newAlgorithmPage = SaveVolumeDataParametersPage(self)
                 
             #self.algorithmStack.addWidget(newAlgorithmPage)
             #self.algorithmSequencePages.append(newAlgorithmPage)
@@ -152,6 +235,7 @@ class CTalgorithmControlsPage(QWidget):
                 self.algorithmStack.addWidget(newAlgorithmPage)
                 self.algorithmSequencePages.append(newAlgorithmPage)
                 self.algorithmSequenceList.setCurrentRow(len(self.algorithmSequencePages)-1)
+    """
             
     def check_any_computed_after(self, current_index):
         for n in range(current_index, len(self.algorithmSequencePages)):

@@ -22,6 +22,38 @@ class MyMessageBox(QDialog):
         self.setLayout(overallGrid)
         self.resize(750,600)
 
+class TableView(QTableWidget):
+    def __init__(self, data1, data2, *args):
+        QTableWidget.__init__(self, *args)
+        self.setWindowTitle("LEAP Material Library")
+        self.data1 = data1
+        self.data2 = data2
+        self.setData()
+        self.resizeColumnsToContents()
+        self.resizeRowsToContents()
+        self.resize(750,600)
+ 
+    def setData(self): 
+        horHeaders = []
+        """
+        for n, key in enumerate(sorted(self.data.keys())):
+            horHeaders.append(key)
+            for m, item in enumerate(self.data[key]):
+                newitem = QTableWidgetItem(item)
+                self.setItem(m, n, newitem)
+        """
+        horHeaders.append('material name')
+        horHeaders.append('density (g/cm^3)')
+        horHeaders.append('chemical formula')
+        for n, key in enumerate(self.data1.keys()):
+            #horHeaders.append(key)
+            #item = self.data1[key]
+            #newitem = QTableWidgetItem(item)
+            self.setItem(n, 0, QTableWidgetItem(key))
+            self.setItem(n, 1, QTableWidgetItem(str(self.data2[key])))
+            self.setItem(n, 2, QTableWidgetItem(self.data1[key]))
+        self.setHorizontalHeaderLabels(horHeaders)
+
 class PhysicsDialogControls(QWidget):
     def __init__(self, parent = None):
         super(PhysicsDialogControls, self).__init__(parent)
@@ -180,8 +212,12 @@ class PhysicsDialogControls(QWidget):
         curRow += 1
         
         plot_spectra_button = QPushButton("Plot Spectra")
+        material_library_button = QPushButton("Material Library")
+        material_library_button.setMaximumWidth(100)
         plot_spectra_button.clicked.connect(self.plot_spectra_button_Clicked)
         overallgrid.addWidget(plot_spectra_button, curRow, 0)
+        material_library_button.clicked.connect(self.material_library_button_Clicked)
+        overallgrid.addWidget(material_library_button, curRow, 1)
         curRow += 1
         
         if self.lctserver.source_spectra_file is not None and len(self.lctserver.source_spectra_file) > 0:
@@ -364,6 +400,14 @@ class PhysicsDialogControls(QWidget):
             plt.ylabel('normalized response (unitless)')
             plt.show()
     
+    def material_library_button_Clicked(self):
+        try:
+            materialFormulas, materialDensities = self.lctserver.physics.get_material_library()
+            self.table = TableView(materialFormulas, materialDensities, len(materialFormulas), 3)
+            self.table.show()
+        except:
+            print('please update the XrayPhysics library to access this feature')
+        
     def openDataFile(self):
         
         loadFileDialog = QFileDialog()

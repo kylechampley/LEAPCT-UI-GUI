@@ -26,9 +26,23 @@ except:
 root_path = os.path.dirname(os.path.realpath(__file__))
 
 class leapctserver:
+    """ This class handles many high-level tasks for LEAP-CT, including file I/O, data chunking, meta-data I/O, and integration of XrayPhysics
+    
+    :ivar leapct: tomographicModels (main LEAP-CT class) object, if none is provided on initialization, one will be created
+    :ivar path(str): full path of where the data is stored and where the output will be saved; one must have R/W permissions to this path
+    :ivar outputDir(str): subfolder of path where the output will be saved; if it does not exist it will be created
+    :ivar air_scan_file(str): file name of the air scan file (relative to path)
+    :ivar dark_scan_file(str): file name of the dark scan file (relative to path)
+    :ivar raw_scan_file(str): file name of the raw radiograph sequence (relative to path)
+    :ivar projection_file(str): file name of transmission or attenuation radiography sequence (relative to path)
+    :ivar data_type(int): tags the data as RAW, RAW_DARK_SUBTRACTED, TRANSMISSION, or, ATTENUATION
+    """
 
     def __init__(self, leapct=None, path=None, outputDir=None):
         if leapct is None:
+            self.leapct = tomographicModels()
+        elif isinstance(leapct, str):
+            path = leapct
             self.leapct = tomographicModels()
         else:
             self.leapct = leapct
@@ -117,6 +131,7 @@ class leapctserver:
         # Section III: data chunking
         [self.PROJECTION, self.DETECTOR_ROW, self.Z_SLICE] = [0, 1, 2]
         self.chunking_type = self.PROJECTION
+        self.numOverlap = 0
         self.num_proj = 0
         self.num_vol = 0
         self.scratch_space = 0.125 # extra memory reserved
@@ -139,6 +154,7 @@ class leapctserver:
         self.num_angles = 0.0
         
         ### Other
+        self.default_algorithms = None
         #self.leapct.reset() # use clearAll
         self.lastImage = None
         
@@ -158,6 +174,12 @@ class leapctserver:
         data = self.leapct.get_gpus()
         f.write(','.join(str(i) for i in data))
         f.write(']\n')
+        
+        f.write('numTVneighbors = ' + str(self.get_numTVneighbors()) + '\n')
+        f.write('backprojector = ' + str(self.get_projector()) + '\n')
+        
+        if self.default_algorithms is not None and len(self.default_algorithms) > 0:
+            f.write('default_algorithms = ' + str(self.default_algorithms) + '\n')
         
         f.close()
         print('leapctserver defaults saved to: ' + str(defaults_file))
@@ -193,7 +215,7 @@ class leapctserver:
         print('======== Physics ========')
         if self.source_spectra_file is not None and len(self.source_spectra_file) > 0:
             print('source_spectra_file = ', self.source_spectra_file)
-        elif self.kV > 0.0:
+        elif self.kV is not None and self.kV > 0.0:
             print('kV = ', self.kV)
             print('anode_material = ', self.anode_material)
             print('takeoff_angle = ', self.takeoff_angle)
@@ -515,7 +537,7 @@ class leapctserver:
         #"""
         if self.source_spectra_file is not None and len(self.source_spectra_file) > 0:
             f.write('source_spectra_file = ' + self.source_spectra_file + '\n')
-        elif self.kV > 0.0:
+        elif self.kV is not None and self.kV > 0.0:
             f.write('kV = ' + str(self.kV) + '\n')
             f.write('anode_material = ' + str(self.anode_material) + '\n')
             f.write('takeoff_angle = ' + str(self.takeoff_angle) + '\n')
@@ -704,15 +726,44 @@ class leapctserver:
         else:
             return None
             
-    def load_volume(fileName, inds):
+    def save_volume(self, f=None, seq_offset=0, update_params=False):
+        """Saves the volume data in a sequence of tif files, one file for each z-slice
+        
+        Args:
+            f (C contiguous float32 numpy array or torch tensor): volume data
+            seq_offset (int): the file sequence number for the first file
+            
+        Returns:
+            The base file name of the saved data, if failed to write to file returns None
+        """
+        if f is None:
+            f = self.f
+        if f is None:
+            print('Error: no volume data exists to save')
+            return None
+        self.create_outputDir()
+        fileName = 'zslice.tif'
+        if self.outputDir in fileName:
+            newFileName = fileName
+        else:
+            newFileName = os.path.join(self.outputDir, fileName)
+        fullPath = os.path.join(self.path, newFileName)
+        
+        if self.leapct.save_volume(fullPath, f, seq_offset) == True:
+            if update_params:
+                self.reconstruction_file = newFileName
+            return newFileName
+        else:
+            return None
+            
+    def load_volume(self, fileName, inds):
         if fileName is None:
             fileName = self.reconstruction_file
         fullPath = os.path.join(self.path, fileName)
-        if os.path.isfile(fullPath) == False:
-            print('Error: ' + str(fullPath) + ' does not exist!')
-            return None
+        #if os.path.isfile(fullPath) == False:
+        #    print('Error: ' + str(fullPath) + ' does not exist!')
+        #    return None
         f = self.leapct.load_data(fullPath, x=None, fileRange=inds, rowRange=None, colRange=None)
-        #self.f = f # ?
         return f
         
     def save_projection_rows(self, g, seq_offset=0):
@@ -861,14 +912,16 @@ class leapctserver:
         self.g = g
         
     def clear_projection_data(self):
-        del self.g
+        if self.g is not None:
+            del self.g
         self.g = None
         
     def set_volume_data(self, f):
         self.f = f
         
     def clear_volume_data(self):
-        del self.f
+        if self.f is not None:
+            del self.f
         self.f = None
         
     def available_RAM(self):
@@ -927,28 +980,45 @@ class leapctserver:
     """
     
     def set_chunk_size(self):
-        if self.leapct.ct_geometry_defined() == False:
-            print('Error: CT geometry not defined!')
-            return False
+        """Sets the size of the largest chunk that can be used to perform a specific algorithm
         
-        self.num_proj = max(1, self.num_proj)
+        BEFORE running this function, one should set the following:
+            self.chunking_type
+            self.num_proj
+            self.num_vol
+        
+        """
         
         if self.chunking_type == self.PROJECTION:
+            if self.leapct.ct_geometry_defined() == False:
+                print('Error: CT geometry not defined!')
+                return False
         
+            self.num_proj = max(1, self.num_proj)
             if self.num_proj * self.projection_memory() < self.max_CPU_memory_usage - self.scratch_space:
                 self.chunk_size = self.leapct.get_numAngles()
             else:
                 numAngles = self.get_numAngles()
                 #chunk_size * self.num_proj * self.projection_memory() / float(numAngles) = self.max_CPU_memory_usage - self.scratch_space
-                self.chunk_size = int(np.float((self.max_CPU_memory_usage - self.scratch_space) * float(numAngles) / (self.num_proj * self.projection_memory())))
+                self.chunk_size = int(float((self.max_CPU_memory_usage - self.scratch_space) * float(numAngles) / (self.num_proj * self.projection_memory())))
+                
+                numChunks = int(np.ceil(float(numAngles)/float(self.chunk_size)))
+                self.chunk_size = int(np.ceil(float(numAngles)/float(numChunks)))
         
         elif self.chunking_type == self.DETECTOR_ROW:
+            if self.leapct.ct_geometry_defined() == False:
+                print('Error: CT geometry not defined!')
+                return False
         
+            self.num_proj = max(1, self.num_proj)
             if self.num_proj * self.projection_memory() < self.max_CPU_memory_usage - self.scratch_space:
                 self.chunk_size = self.leapct.get_numRows()
             else:
                 numRows = self.get_numRows()
-                self.chunk_size = int(np.float((self.max_CPU_memory_usage - self.scratch_space) * float(numRows) / (self.num_proj * self.projection_memory())))
+                self.chunk_size = int(float((self.max_CPU_memory_usage - self.scratch_space) * float(numRows) / (self.num_proj * self.projection_memory())))
+                
+                numChunks = int(np.ceil(float(numRows)/float(self.chunk_size)))
+                self.chunk_size = int(np.ceil(float(numRows)/float(numChunks)))
         
         elif self.chunking_type == self.Z_SLICE:
             self.chunk_size = 1
@@ -960,20 +1030,32 @@ class leapctserver:
             memory_remaining = self.max_CPU_memory_usage - self.scratch_space - self.memory_usage()
             if memory_remaining <= 0.0:
                 return False
-            
+                
             numZ = float(self.leapct.get_numZ())
-            numRows = float(self.leapct.get_numRows())
-            while self.chunk_size < numZ:
-                numRows_needed = float(self.leapct.numRowsRequiredForBackprojectingSlab(self.chunk_size))
-                mem_needed = self.num_vol*self.volume_memory()*self.chunk_size/numZ + self.num_proj*self.projection_memory()*numRows_needed/numRows
-                if mem_needed > memory_remaining:
-                    self.chunk_size = self.chunk_size-1
-                    break
-                self.chunk_size = self.chunk_size + 1
-            self.chunk_size = min(self.chunk_size, numZ)
-            numChunks = int(np.ceil(float(numZ)/float(self.chunk_size)))
-            self.chunk_size = int(np.ceil(float(numZ)/float(numChunks)))
-            return True
+            
+            if self.num_proj <= 0:
+                # Postprocessing Algorithm
+                if self.num_vol * self.volume_memory() < self.max_CPU_memory_usage - self.scratch_space:
+                    self.chunk_size = numZ
+                else:
+                    self.chunk_size = int(float((self.max_CPU_memory_usage - self.scratch_space) * float(numZ) / (self.num_vol * self.volume_memory())))
+                    
+                    numChunks = int(np.ceil(float(numZ)/float(self.chunk_size)))
+                    self.chunk_size = int(np.ceil(float(numZ)/float(numChunks)))
+            else:
+                # Reconstruction Algorithm
+                numRows = float(self.leapct.get_numRows())
+                while self.chunk_size < numZ:
+                    numRows_needed = float(self.leapct.numRowsRequiredForBackprojectingSlab(self.chunk_size))
+                    mem_needed = self.num_vol*self.volume_memory()*self.chunk_size/numZ + self.num_proj*self.projection_memory()*numRows_needed/numRows
+                    if mem_needed > memory_remaining:
+                        self.chunk_size = self.chunk_size-1
+                        break
+                    self.chunk_size = self.chunk_size + 1
+                self.chunk_size = min(self.chunk_size, numZ)
+                numChunks = int(np.ceil(float(numZ)/float(self.chunk_size)))
+                self.chunk_size = int(np.ceil(float(numZ)/float(numChunks)))
+                return True
                 
         else:
             print('Error: chunking_type value is invalid')
@@ -1137,12 +1219,15 @@ class leapctserver:
             aProj[0,:,:] = self.g[iProj, :, :]
         return aProj
         
-    def grab_necessary_sinograms_for_reconstruction(self, iz):
+    def grab_necessary_sinograms_for_reconstruction(self, iz, numPad=0):
         if self.leapct.ct_geometry_defined() == False or self.leapct.ct_volume_defined() == False:
             return None, None
         if iz < 0 or iz >= self.leapct.get_numZ():
             iz = self.leapct.get_numZ()//2
         rowRange = self.leapct.rowRangeNeededForBackprojection(iz)
+        if numPad > 0:
+            rowRange[0] = max(0, rowRange[0]-numPad)
+            rowRange[1] = min(self.leapct.get_numRows()-1, rowRange[1]+numPad)
         #print(rowRange)
         if rowRange is None:
             return None, None
@@ -1486,7 +1571,7 @@ class leapctserver:
             print('Error: estimate_tilt current only implemented for attenuation data')
             return 0.0
     
-    def ringRemoval_fast(self, delta=0.01, numIter=30, maxChange=0.05, tryIndex=None):
+    def ringRemoval(self, delta=0.01, beta=1.0e3, numIter=30, maxChange=0.05, which='fast', tryIndex=None):
         if self.leapct.ct_geometry_defined() == False:
             print('Error: CT geometry not defined!')
             return False
@@ -1497,17 +1582,28 @@ class leapctserver:
                     if self.g is None:
                         print('Error: failed to load data')
                         return False
-                return leap_preprocessing_algorithms.ringRemoval_fast(self.leapct, self.g, delta, numIter, maxChange)
+                if which == 'fast':
+                    return leap_preprocessing_algorithms.ringRemoval_fast(self.leapct, self.g, delta, beta, numIter, maxChange)
+                else:
+                    return leap_preprocessing_algorithms.ringRemoval(self.leapct, self.g, delta, beta, numIter, maxChange)
             else:
                 iz = tryIndex
                 if iz < 0 or iz >= self.leapct.get_numZ():
                     iz = self.leapct.get_numZ()//2
-                g_ROI, rowRange = self.grab_necessary_sinograms_for_reconstruction(iz)
+                #g_ROI = self.g.copy()
+                #rowRange = [0, g_ROI.shape[1]-1]
+                g_ROI, rowRange = self.grab_necessary_sinograms_for_reconstruction(iz, 3)
+                print(rowRange)
                 if g_ROI is None:
                     print('Error: failed to load data')
                     return False
                 
-                leap_preprocessing_algorithms.ringRemoval_fast(self.leapct, g_ROI, delta, numIter, maxChange)
+                g_copy = g_ROI.copy()
+                if which == 'fast':
+                    leap_preprocessing_algorithms.ringRemoval_fast(self.leapct, g_ROI, delta, beta, numIter, maxChange)
+                else:
+                    leap_preprocessing_algorithms.ringRemoval(self.leapct, g_ROI, delta, beta, numIter, maxChange)
+                #self.lastImage = np.squeeze(g_copy[:,g_copy.shape[1]//2,:] - g_ROI[:,g_copy.shape[1]//2,:])
                 self.leapct_backup.copy_parameters(self.leapct)
                 self.leapct_backup.crop_projections(rowRange)
                 f_slice = self.leapct_backup.FBP_slice(g_ROI, iz)
@@ -1530,21 +1626,6 @@ class leapctserver:
                     print('Error: failed to load data')
                     return False
             return leap_preprocessing_algorithms.ringRemoval_median(self.leapct, self.g, threshold, windowSize, numIter)
-        else:
-            print('Error: ring removal current only implemented for attenuation data')
-            return False
-        
-    def ringRemoval(self, delta=0.01, beta=1.0e1, numIter=30):
-        if self.leapct.ct_geometry_defined() == False:
-            print('Error: CT geometry not defined!')
-            return False
-        if self.data_type == self.ATTENUATION:
-            if self.g is None:
-                self.g = self.load_projections()
-                if self.g is None:
-                    print('Error: failed to load data')
-                    return False
-            return leap_preprocessing_algorithms.ringRemoval(self.leapct, self.g, delta, beta, numIter)
         else:
             print('Error: ring removal current only implemented for attenuation data')
             return False
@@ -1686,14 +1767,131 @@ class leapctserver:
             print('Error: singleMaterialBHC current only implemented for attenuation data')
             return False
             
-    def projection_processing(self, func, g):
-        func(g)
+    def projection_processing(self, algorithm, tryIndex=None):
+        pass
         
     def sinogram_processing(self):
         pass
         
     def reconstruction_slab_processing(self):
         pass
+        
+    def zslice_processing(self, algorithm, tryIndex=None):
+        if self.leapct.ct_volume_defined() == False:
+            print('Error: CT volume must be defined before running this algorithm!')
+            return False
+        
+        if tryIndex is None:
+            # Need to process the whole volume
+            if self.num_vol*self.volume_memory() >= self.max_CPU_memory_usage:
+                # not enough memory for this operation, so clear any memory currently being used
+                self.clear_projection_data()
+                if self.f is not None:
+                    # save volume data first
+                    print('Saving volume to disk...')
+                    self.save_volume(self.f, update_params=True)
+                    self.clear_volume_data()
+                    
+                ############################################################################################
+                self.set_chunk_size()
+                output_file = os.path.join(self.outputDir, 'zslice.tif')
+                output_full_path = os.path.join(self.path, output_file)
+                self.create_outputDir() # do I really need to do this?
+                
+                numZ = self.leapct.get_numZ()
+                numChunks = int(np.ceil(float(numZ)/float(self.chunk_size)))
+                
+                print('Performing algorithm in ' + str(numChunks) + ' chunks of ' + str(self.chunk_size) + ' slices...')
+                
+                if self.numOverlap > 0:
+                    f_lastSlices = np.zeros((self.numOverlap, self.leapct.get_numY(), self.leapct.get_numX()), dtype=np.float32)
+                else:
+                    f_lastSlices = None
+                    
+                last_slice = None
+                for n in range(numChunks):
+                    print('processing chunk ' + str(n+1) + ' of ' + str(numChunks))
+                    
+                    sliceStart = n*self.chunk_size
+                    sliceEnd = min(numZ-1, sliceStart + self.chunk_size - 1)
+                    
+                    sliceStart_pad = max(0, sliceStart - self.numOverlap)
+                    sliceEnd_pad = min(numZ-1, sliceEnd + self.numOverlap)
+                    
+                    padded_left_slices = []
+                    padded_right_slices = []
+                    if sliceStart_pad < sliceStart:
+                        padded_left_slices = list(range(sliceStart_pad-sliceStart_pad, sliceStart-sliceStart_pad))
+                    if sliceEnd_pad > sliceEnd:
+                        padded_right_slices = list(range(sliceEnd+1-sliceStart_pad, sliceEnd_pad+1-sliceStart_pad))
+                    padded_slices = padded_left_slices + padded_right_slices
+                    
+                    print('reading ' + str(self.reconstruction_file) + '...')
+                    f_chunk = self.load_volume(self.reconstruction_file, [sliceStart_pad, sliceEnd_pad])
+                    if f_chunk is None:
+                        print('failed to load slices!')
+                        
+                    if self.numOverlap >= 1:
+                        if n > 0:
+                            f_chunk[0:self.numOverlap,:,:] = f_lastSlices[:]
+                        if n < numChunks-1:
+                            f_lastSlices[:] = f_chunk[f_chunk.shape[0]-self.numOverlap:f_chunk.shape[0],:,:]
+                        
+                    algorithm(f_chunk)
+                    
+                    # Perform single-slice feathering between slabs
+                    if self.numOverlap >= 1:
+                        if last_slice is not None:
+                            f_chunk[self.numOverlap,:,:] = 0.5*(last_slice[:,:] + f_chunk[self.numOverlap,:,:])
+                        
+                        last_slice = np.zeros((f_chunk.shape[1], f_chunk.shape[2]), dtype=np.float32)
+                        last_slice[:,:] = f_chunk[f_chunk.shape[0]-self.numOverlap,:,:]
+                            
+                    if len(padded_slices) > 0:
+                        f_chunk = np.delete(f_chunk, padded_slices, axis=0)
+                    
+                    if n == numChunks-1:
+                        update_params = True
+                    else:
+                        update_params = False
+                    
+                    self.save_volume(f_chunk, sliceStart, update_params=update_params)
+                    if update_params:
+                        self.save_parameters()
+                    del f_chunk
+                
+                return True
+            else:
+                # there is enough memory to perform operation in one chunk
+                if self.memory_used_by_array(self.g) + self.num_vol*self.volume_memory() >= self.max_CPU_memory_usage:
+                    # clear projection data memory because it pushes us past the limit
+                    self.clear_projection_data()
+                if self.f is None:
+                    self.f = self.load_volume(self.reconstruction_file)
+                if self.f is None:
+                    print('Error: failed to load data')
+                    return False
+                if algorithm(self.f) is not None:
+                    return True
+                else:
+                    return False
+        else:
+            # just trying this algorithm for a single slice
+            iz = tryIndex
+            numZ = self.leapct.get_numZ()
+            if iz < 0 or iz >= numZ:
+                iz = numZ//2
+            sliceRange = [max(0, min(iz-self.numOverlap, numZ-1)), max(0, min(iz+self.numOverlap, numZ-1))]
+            f_ROI = self.grab_slices(sliceRange) # will grab from self.f if it exists, otherwise will read from file
+            if f_ROI is None:
+                print('Error: failed to load data')
+                return False
+            else:
+                algorithm(f_ROI)
+                self.lastImage = np.squeeze(f_ROI[f_ROI.shape[0]//2,:,:])
+                del f_ROI
+                return True
+        
     
     ###################################################################################################################
     ###################################################################################################################
@@ -1759,6 +1957,13 @@ class leapctserver:
             if self.leapct.FBP(self.g, self.f) is not None:
                 if doClipping:
                     self.f[self.f<0.0] = 0.0
+                    minValue = 0.0
+                else:
+                    minValue = np.min(self.f)
+                maxValue = np.max(self.f)
+                print('range of values: ' + str(minValue) + ', ' + str(maxValue))
+                if self.leapct.wmax is None:
+                    self.leapct.wmax = maxValue
                 return True
             else:
                 return False
@@ -1780,6 +1985,8 @@ class leapctserver:
             
             print('Performing FBP in ' + str(numChunks) + ' chunks of ' + str(self.chunk_size) + ' slices...')
             
+            minValue = None
+            maxValue = None
             for n in range(numChunks):
                 print('processing chunk ' + str(n+1) + ' of ' + str(numChunks))
                 self.leapct_backup.copy_parameters(self.leapct)
@@ -1799,10 +2006,23 @@ class leapctserver:
                 
                 if doClipping:
                     f_chunk[f_chunk<0.0] = 0.0
+                    minValue_cur = 0.0
+                else:
+                    minValue_cur = np.min(f_chunk)
+                maxValue_cur = np.max(f_chunk)
+                if minValue is None:
+                    minValue = minValue_cur
+                    maxValue = maxValue_cur
+                else:
+                    minValue = min(minValue, minValue_cur)
+                    maxValue = max(maxValue, maxValue_cur)
                 
                 self.leapct_backup.save_volume(output_full_path, f_chunk, sliceStart)
                 del f_chunk
             self.reconstruction_file = output_file
+            print('range of values: ' + str(minValue) + ', ' + str(maxValue))
+            if self.leapct.wmax is None:
+                self.leapct.wmax = maxValue
             return True
             
     def FBP_slice(self, islice=None, coord='z'):
@@ -1837,6 +2057,99 @@ class leapctserver:
         else:
             return False
         
+    def tight_volume(self, threshold, L=8, tryIndex=None):
+        if self.leapct.all_defined() == False:
+            print('Error: CT geometry and CT volume must be defined before running this algorithm!')
+            return False
+        if self.data_type != self.ATTENUATION:
+            print('Error: data_type must be ATTENUATION for reconstruction')
+            return False
+        
+        if self.projection_memory() >= self.max_CPU_memory_usage:
+            print('Error: insufficient memory!')
+            return False
+        
+        if self.g is None:
+            self.g = self.load_projections()
+            if self.g is None:
+                print('Error: failed to load data')
+                return False
+    
+        self.leapct_backup.copy_parameters(self.leapct)
+        
+        self.leapct.set_default_volume()
+        self.leapct.set_diameterFOV(self.leapct.get_numX()*self.leapct.get_voxelWidth())
+        self.leapct.set_default_volume(float(L))
+        self.leapct.set_projector('SF')
+        self.leapct.set_rampFilter(0)
+        f = self.leapct.FBP(self.g)
+        
+        if threshold > np.max(f):
+            self.leapct.copy_parameters(self.leapct_backup)
+            print('Error: threshold exceeds maximum value of reconstruction!')
+            return False
+        
+        M_yx = np.amax(np.amax(f,axis=2),axis=1)
+        M_zx = np.amax(np.amax(f,axis=2),axis=0)
+        M_zy = np.amax(np.amax(f,axis=1),axis=0)
+        
+        ind_x = np.squeeze(np.argwhere(M_zy > threshold))
+        ind_y = np.squeeze(np.argwhere(M_zx > threshold))
+        ind_z = np.squeeze(np.argwhere(M_yx > threshold))
+        x = self.leapct.x_samples()
+        y = self.leapct.y_samples()
+        z = self.leapct.z_samples()
+        AABB = [x[ind_x[0]], x[ind_x[-1]], y[ind_y[0]], y[ind_y[-1]], z[ind_z[0]], z[ind_z[-1]]]
+
+        self.leapct.set_default_volume()
+        T_x = self.leapct.get_voxelWidth()
+        T_z = self.leapct.get_voxelHeight()
+        numX_full = self.leapct.get_numX()
+        numY_full = self.leapct.get_numY()
+        numZ_full = self.leapct.get_numZ()
+        offsetZ_full = self.leapct.get_offsetZ()
+        numX = int((AABB[1]-AABB[0])/T_x)+3*int(L)
+        numY = int((AABB[3]-AABB[2])/T_x)+3*int(L)
+        numZ = int((AABB[5]-AABB[4])/T_z)+2*int(L)
+        offsetX = 0.5*(AABB[0]+AABB[1])
+        offsetY = 0.5*(AABB[2]+AABB[3])
+        offsetZ = 0.5*(AABB[4]+AABB[5])
+        
+        if numX > numX_full:
+            numX = numX_full
+            offsetX = 0.0
+        if numY > numY_full:
+            numY = numY_full
+            offsetY = 0.0
+        if numZ > numZ_full:
+            numZ = numZ_full
+            offsetZ = offsetZ_full
+        
+        #self.leapct.print_parameters()
+        self.leapct.copy_parameters(self.leapct_backup)
+        self.leapct.set_volume(numX, numY, numZ, T_x, T_z, offsetX, offsetY, offsetZ)
+        #self.leapct.print_parameters()
+        reductionFactor = (float(numX_full)*float(numY_full)*float(numZ_full)) / (float(numX)*float(numY)*float(numZ))
+        print('Reduced volume size by a factor of: ' + str(reductionFactor))
+        
+        if tryIndex is not None:
+            iz = tryIndex
+            if iz < 0 or iz >= self.leapct.get_numZ():
+                iz = self.leapct.get_numZ()//2
+            g_ROI, rowRange = self.grab_necessary_sinograms_for_reconstruction(iz)
+            if g_ROI is None:
+                print('Error: failed to load data')
+                return False
+            
+            self.leapct.crop_projections(rowRange)
+            f_slice = self.leapct.FBP_slice(g_ROI, iz)
+            del g_ROI
+            self.lastImage = np.squeeze(f_slice)
+            self.leapct.copy_parameters(self.leapct_backup)
+            return True
+        else:
+            return True
+    
     def SIRT(self, numIter, mask=None):
         #self.leapct.SIRT(g, f, numIter, mask)
         pass
@@ -1884,109 +2197,51 @@ class leapctserver:
     ###################################################################################################################
     ###################################################################################################################
     def MedianFilter(self, threshold=0.0, windowSize=3, tryIndex=None):
-        if self.leapct.ct_volume_defined() == False:
-            print('Error: CT volume must be defined before running this algorithm!')
-            return False
-        if tryIndex is None:
-            if self.f is None:
-                
-                if self.memory_usage() + self.volume_memory() >= self.max_CPU_memory_usage:
-                    print('Error: not enough CPU RAM to run this algorithm!')
-                    return False
-                
-                self.f = self.load_volume(self.reconstruction_file)
-                if self.f is None:
-                    print('Error: failed to load data')
-                    return False
-            if self.leapct.MedianFilter(self.f, threshold, windowSize) is not None:
-                return True
-            else:
-                return False
-        else:
-            iz = tryIndex
-            numZ = self.leapct.get_numZ()
-            if iz < 0 or iz >= numZ:
-                iz = numZ//2
-            sliceRange = [max(0, min(iz-1, numZ-1)), max(0, min(iz+1, numZ-1))]
-            f_ROI = self.grab_slices(sliceRange)
-            if f_ROI is None:
-                print('Error: failed to load data')
-                return False
-            else:
-                self.leapct.MedianFilter(f_ROI, threshold, windowSize)
-                self.lastImage = np.squeeze(f_ROI[f_ROI.shape[0]//2,:,:])
-                del f_ROI
-                return True
+        self.chunking_type = self.Z_SLICE
+        self.numOverlap = 1
+        self.num_proj = 0
+        self.num_vol = 2
+        
+        algorithm = lambda f: self.leapct.MedianFilter(f, threshold, windowSize)
+        return self.zslice_processing(algorithm, tryIndex)
         
     def MedianFilter2D(self, threshold=0.0, windowSize=3, tryIndex=None):
-        if self.leapct.ct_volume_defined() == False:
-            print('Error: CT volume must be defined before running this algorithm!')
-            return False
-        if tryIndex is None:
-            if self.f is None:
-            
-                if self.memory_usage() + self.volume_memory() >= self.max_CPU_memory_usage:
-                    print('Error: not enough CPU RAM to run this algorithm!')
-                    return False
-            
-                self.f = self.load_volume(self.reconstruction_file)
-                if self.f is None:
-                    print('Error: failed to load data')
-                    return False
-            if self.leapct.MedianFilter2D(self.f, threshold, windowSize) is not None:
-                return True
-            else:
-                return False
-        else:
-            iz = tryIndex
-            numZ = self.leapct.get_numZ()
-            if iz < 0 or iz >= numZ:
-                iz = numZ//2
-            sliceRange = [iz, iz]
-            f_ROI = self.grab_slices(sliceRange)
-            if f_ROI is None:
-                print('Error: failed to load data')
-                return False
-            else:
-                self.leapct.MedianFilter2D(f_ROI, threshold, windowSize)
-                self.lastImage = np.squeeze(f_ROI[f_ROI.shape[0]//2,:,:])
-                del f_ROI
-                return True
+        self.chunking_type = self.Z_SLICE
+        self.numOverlap = 0
+        self.num_proj = 0
+        self.num_vol = 1
+        
+        algorithm = lambda f: self.leapct.MedianFilter2D(f, threshold, windowSize)
+        return self.zslice_processing(algorithm, tryIndex)
         
     def TVdenoising(self, delta=0.001, beta=1.0e1, numIter=20, p=1.2, tryIndex=None):
-        if self.leapct.ct_volume_defined() == False:
-            print('Error: CT volume must be defined before running this algorithm!')
+        self.chunking_type = self.Z_SLICE
+        self.numOverlap = 3 # 4?
+        self.num_proj = 0
+        self.num_vol = 3
+        
+        algorithm = lambda f: self.leapct.TV_denoise(f, delta, beta, numIter, p)
+        return self.zslice_processing(algorithm, tryIndex)
+    
+    def compress_volume(self, dtype=np.uint16, wmin=0.0, wmax=None):
+        if self.reconstruction_file is None or len(self.reconstruction_file) == 0:
+            print('Error: reconstruction_file not set!')
             return False
-        if tryIndex is None:
-            if self.f is None:
-                
-                if self.memory_usage() + self.volume_memory() >= self.max_CPU_memory_usage:
-                    print('Error: not enough CPU RAM to run this algorithm!')
-                    return False
             
-                self.f = self.load_volume(self.reconstruction_file)
-                if self.f is None:
-                    print('Error: failed to load data')
+        fileList = self.leapct.get_file_list(os.path.join(self.path, self.reconstruction_file))
+        if fileList is not None and len(fileList) > 0:
+            self.leapct.set_fileIO_parameters(dtype, wmin, wmax)
+            for n in range(len(fileList)):
+                x = self.leapct.load_tif(fileList[n])
+                if x is None:
+                    self.leapct.file_dtype = np.float32
                     return False
-            if self.leapct.TV_denoise(self.f, delta, beta, numIter, p) is not None:
-                return True
-            else:
-                return False
+                else:
+                    self.leapct.save_tif(fileList[n], x)
+            self.leapct.file_dtype = np.float32
+            return True
         else:
-            iz = tryIndex
-            numZ = self.leapct.get_numZ()
-            if iz < 0 or iz >= numZ:
-                iz = numZ//2
-            sliceRange = [max(0, min(iz-4, numZ-1)), max(0, min(iz+4, numZ-1))]
-            f_ROI = self.grab_slices(sliceRange)
-            if f_ROI is None:
-                print('Error: failed to load data')
-                return False
-            else:
-                self.leapct.TV_denoise(f_ROI, delta, beta, numIter, p)
-                self.lastImage = np.squeeze(f_ROI[f_ROI.shape[0]//2,:,:])
-                del f_ROI
-                return True
+            return False
     
     ###################################################################################################################
     ###################################################################################################################
@@ -2100,6 +2355,10 @@ class leapctserver:
                 self.source_spectra_file = ""
             case "referenceEnergy":
                 self.reference_energy = -1.0
+            case "numTVneighbors":
+                self.leapct.set_numTVneighbors(26)
+            case "projector" | "backprojector":
+                self.leapct.set_projector('SF')
             case "rfilter":
                 self.leapct.set_rampFilter(2)
             case "rampFWHM":
@@ -2274,6 +2533,12 @@ class leapctserver:
                 self.source_spectra_file = value
             case "referenceEnergy" | "reference_energy":
                 self.reference_energy = float(value)
+            case "numTVneighbors":
+                self.leapct.set_numTVneighbors(int(value))
+            case "projector" | "backprojector":
+                self.leapct.set_projector(value)
+            case "default_algorithms":
+                self.default_algorithms = eval(value)
             case "rfilter":
                 self.leapct.set_rampFilter(int(value))
             case "rampID" | "rampFilter":
@@ -2470,6 +2735,10 @@ class leapctserver:
                 return self.source_spectra_file
             case "referenceEnergy":
                 return str(self.reference_energy)
+            case "numTVneighbors":
+                return str(self.leapct.get_numTVneighbors())
+            case "projector" | "backprojector":
+                return self.leapct.get_projector()
             case "rfilter":
                 return str(self.leapct.get_rampFilter())
             case "rampID":
@@ -2722,6 +2991,10 @@ class leapctserver:
                     return False
                 else:
                     return True
+            case "numTVneighbors":
+                return False
+            case "projector" | "backprojector":
+                return False
             case "rfilter":
                 return False
             case "rxsize":
@@ -2835,12 +3108,21 @@ class leapctserver:
         self.geometry_file = None
     
     def load_key_equal_value(self, fileName):
+        if os.path.isfile(fileName) == False:
+            fileName = os.path.join(self.path, fileName)
+            if os.path.isfile(fileName) == False:
+                print('Error: meta-data file does not exist!')
+                return
         fdes = open(fileName, 'r')
         Lines = fdes.readlines()
         for line in Lines:
             if "=" in line:
                 #print(line)
                 self.set_cmd(line, False)
+            else:
+                line = line.rstrip()
+                if line.endswith('.txt'):
+                    self.load_key_equal_value(line)
         if self.path is None or len(self.path) == 0:
             self.path = os.path.split(fileName)[0]
         

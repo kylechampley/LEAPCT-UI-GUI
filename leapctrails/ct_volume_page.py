@@ -166,6 +166,7 @@ class CTvolumePage(QWidget):
         ######### RAMP FILTER END #########
         
         ######### COMPRESS VOLUME FILE START #########
+        """
         compress_file_group = QGroupBox("Volume File Settings")
         compress_file_layout = QHBoxLayout()
         self.file_dtype_combo = QComboBox()
@@ -191,6 +192,7 @@ class CTvolumePage(QWidget):
         self.wmax_edit.setEnabled(False)
         compress_file_group.setEnabled(False)
         compress_file_group.setToolTip("Not yet implemented")
+        """
         ######### COMPRESS VOLUME FILE END #########
         
         # Next section should be FBP settings, including offsetScan, truncatedScan, and ramp filter specification
@@ -207,8 +209,11 @@ class CTvolumePage(QWidget):
         overall_grid.addLayout(ramp_layout, curRow, 1, 1, 1)
         curRow += 1
         
-        overall_grid.addWidget(compress_file_group, curRow, 0, 1, 1)
-        curRow += 1
+        #overall_grid.addWidget(compress_file_group, curRow, 0, 1, 1)
+        #curRow += 1
+        
+        overall_grid.setRowStretch(overall_grid.rowCount(), 1)
+        #overall_grid.setColumnStretch(overall_grid.columnCount(), 1)
         
         self.setLayout(overall_grid)
         self.refresh()
@@ -253,7 +258,7 @@ class CTvolumePage(QWidget):
         elif self.leapct.get_rampFilter() == 10:
             self.ramp_combo.setCurrentIndex(3)
         
-        #"""
+        """
         if self.leapct.file_dtype == np.uint8:
             self.file_dtype_combo.setCurrentIndex(0)
         elif self.leapct.file_dtype == np.uint16:

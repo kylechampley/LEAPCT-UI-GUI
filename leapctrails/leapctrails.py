@@ -20,7 +20,7 @@ class leapctrails(QMainWindow):
     def __init__(self, lctserver=None, parent = None):
         super(leapctrails, self).__init__(parent)
 
-        self.versionNumber = "0.2"
+        self.versionNumber = "0.3"
         print ("LEAP-CT Rails v" + str(self.versionNumber))
         if lctserver is None:
             self.lctserver = leapctserver()
@@ -64,8 +64,8 @@ class leapctrails(QMainWindow):
         self.workflowWindow.refreshAllPages()
         
     def verify_version(self):
-        versionText_min = "1.22"
-        versionNumberHash_min = 1*10000 + 22*100 + 0
+        versionText_min = "1.23"
+        versionNumberHash_min = 1*10000 + 23*100 + 0
     
         versionText = self.leapct.version()
         if versionText == "unknown":

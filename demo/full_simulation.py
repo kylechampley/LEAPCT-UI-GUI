@@ -75,6 +75,7 @@ t *= flux[:,None,None]
 t += dark_scan
 air_scan += dark_scan
 
+leapct.set_default_volume()
 leapct.save_projections(raw_file, t)
 imageio.imwrite(air_file, air_scan)
 imageio.imwrite(dark_file, dark_scan)

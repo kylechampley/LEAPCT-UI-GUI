@@ -1,0 +1,7 @@
+numpy
+torch
+imageio
+scipy
+matplotlib
+PyQt5
+sphinx-rtd-theme

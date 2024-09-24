@@ -161,6 +161,9 @@ class FileNamesPage(QWidget):
         overall_grid.addLayout(file_grid, curRow, 2)
         ######### FILE NAMES END #########
         
+        #overall_grid.setRowStretch(overall_grid.rowCount(), 1)
+        #overall_grid.setColumnStretch(overall_grid.columnCount(), 1)
+        
         self.setLayout(overall_grid)
         
         self.refresh()

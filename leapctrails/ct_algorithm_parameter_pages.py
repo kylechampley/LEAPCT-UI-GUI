@@ -11,6 +11,20 @@ from leapctserver import *
 from help_preview_execute_button_box import *
 from progress_dialog import *
 
+class MyMessageBox(QDialog):
+    """ This can be used to display text, such as algorithm descriptions """
+    def __init__(self, title, text, parent = None):
+        super(MyMessageBox, self).__init__(parent, Qt.WindowSystemMenuHint | Qt.WindowTitleHint | Qt.WindowCloseButtonHint)
+        self.setWindowTitle(title)
+
+        textLabel = QPlainTextEdit()
+        textLabel.setReadOnly(True)
+        textLabel.setPlainText(text)
+
+        overallGrid = QGridLayout()
+        overallGrid.addWidget(textLabel, 0, 0)
+        self.setLayout(overallGrid)
+        self.resize(300,150)
 
 class AlgorithmParameterPage(QWidget):
     """ 
@@ -550,20 +564,30 @@ class RingRemovalParametersPage(AlgorithmParameterPage):
         
         overall_layout = QGridLayout()
         
+        which_algorithm_group = QGroupBox("algorithm")
+        which_algorithm_layout = QVBoxLayout()
+        self.fast_radio = QRadioButton("fast")
+        self.accurate_radio = QRadioButton("accurate")
+        which_algorithm_layout.addWidget(self.fast_radio)
+        which_algorithm_layout.addWidget(self.accurate_radio)
+        which_algorithm_group.setLayout(which_algorithm_layout)
+        self.fast_radio.setChecked(True)
+        
         #num iter, max change, delta
-        numIter_label = QLabel("Number of Iterations")
+        numIter_label = QLabel("<div align='right'>Number of Iterations</div>")
         self.numIter_edit = QLineEdit("30")
-        maxChange_label = QLabel("Max Change (%)")
+        maxChange_label = QLabel("<div align='right'>Max Change</div>")
         self.maxChange_edit = QLineEdit("0.05")
-        delta_label = QLabel("delta")
+        delta_label = QLabel("<div align='right'>delta</div>")
         self.delta_edit = QLineEdit("0.01")
         
-        overall_layout.addWidget(numIter_label, 0, 0)
-        overall_layout.addWidget(self.numIter_edit, 0, 1)
-        overall_layout.addWidget(maxChange_label, 1, 0)
-        overall_layout.addWidget(self.maxChange_edit, 1, 1)
-        overall_layout.addWidget(delta_label, 2, 0)
-        overall_layout.addWidget(self.delta_edit, 2, 1)
+        overall_layout.addWidget(numIter_label, 0, 1)
+        overall_layout.addWidget(self.numIter_edit, 0, 2)
+        overall_layout.addWidget(maxChange_label, 1, 1)
+        overall_layout.addWidget(self.maxChange_edit, 1, 2)
+        overall_layout.addWidget(delta_label, 2, 1)
+        overall_layout.addWidget(self.delta_edit, 2, 2)
+        overall_layout.addWidget(which_algorithm_group, 0, 0, 3, 1)
         
         # Add the help/preview/execute button box in the lower right corner:
         exe_buttons_layout = QHBoxLayout()
@@ -627,8 +651,16 @@ class RingRemovalParametersPage(AlgorithmParameterPage):
         progressDialog.setModal(True)
         progressDialog.show()
         
-        print("ringRemoval_fast...")
-        if self.lctserver.ringRemoval_fast(delta, numIter, maxChange, tryIndex):
+        if self.fast_radio.isChecked():
+            which = 'fast'
+        else:
+            which = 'accurate'
+        if which == 'fast':
+            beta = 1.0e3
+        else:
+            beta = 1.0e1
+        print("ringRemoval...")
+        if self.lctserver.ringRemoval(delta, beta, numIter, maxChange, which, tryIndex):
             if tryIndex is None:
                 self.completedSuccessfully()
         
@@ -963,6 +995,7 @@ class SaveProjectionDataParametersPage(AlgorithmParameterPage):
         progressDialog.setModal(True)
         progressDialog.show()
         
+        print("saving projection data...")
         if self.lctserver.save_projection_angles(update_params=True) is not None:
             self.lctserver.save_parameters()
             self.completedSuccessfully()
@@ -970,6 +1003,104 @@ class SaveProjectionDataParametersPage(AlgorithmParameterPage):
         progressDialog.close()
         QApplication.restoreOverrideCursor()
 
+
+class TightVolumeParametersPage(AlgorithmParameterPage):
+    def __init__(self, parent = None):
+        super(TightVolumeParametersPage, self).__init__(parent)
+
+        self.parent = parent
+        
+        overall_layout = QGridLayout()
+        threshold_label = QLabel("<div align='right'>threshold</div>")
+        self.threshold_edit = QLineEdit()
+        overall_layout.addWidget(threshold_label, 0, 0)
+        overall_layout.addWidget(self.threshold_edit, 0, 1)
+        
+        if self.lctserver.object_model is not None and self.lctserver.reference_energy > 0.0:
+            mu = self.lctserver.physics.mu(self.lctserver.object_model[0], self.lctserver.reference_energy, self.lctserver.object_model[1])
+            self.threshold_edit.setText(str(0.5*mu))
+        
+        overall_layout.setRowStretch(overall_layout.rowCount(), 1)
+        overall_layout.setColumnStretch(overall_layout.columnCount(), 1)
+        
+        # Add the help/preview/execute button box in the lower right corner:
+        exe_buttons_layout = QHBoxLayout()
+        exe_buttons_layout.addWidget(self.buttonBox)
+        exe_buttons_layout.addStretch(1)
+
+        overall_vlayout = QVBoxLayout()
+        overall_vlayout.addLayout(overall_layout)
+        overall_vlayout.addLayout(exe_buttons_layout)
+        overall_vlayout.addStretch(1)
+
+        self.buttonBox.previewButton.setEnabled(True)
+        self.setLayout(overall_vlayout)
+        
+        self.buttonBox.helpButton.clicked.connect(self.help_button_Clicked)
+        self.buttonBox.previewButton.clicked.connect(self.preview_button_Clicked)
+        self.buttonBox.executeButton.clicked.connect(self.execute_button_Clicked)
+        
+    def help_button_Clicked(self):
+        currentHelpText = "This algorithm generates a very low-resolution reconstruction with FBP and estimates the smallest axis aligned bounding box for which there are no voxels outside this box that are above the user-specified threshold.  The CT volume parameters are set accordingly."
+        msg = MyMessageBox("Tight Volume", currentHelpText)
+        msg.exec_()
+    
+    def preview_button_Clicked(self):
+        self.previewAlgorithm()
+        
+    def execute_button_Clicked(self):
+        if self.computeState == 0:
+            self.execute_algorithm()
+            
+    def execute_algorithm(self, tryIndex=None):
+    
+        if len(self.threshold_edit.text()) > 0:
+            try:
+                threshold = float(self.threshold_edit.text())
+            except:
+                threshold = None
+        else:
+            threshold = None
+            
+        if threshold is None:
+            print('Error: must specify threshold')
+            return
+    
+        if self.parent.runningPreviousAlgorithms == False:
+            if self.parent.runPreviousAlgorithms() == False:
+                return
+    
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        progressDialog = ProgressDialog(self.parent, "processing find_centerCol...")
+        progressDialog.setModal(True)
+        progressDialog.show()
+        
+        print("tight_volume...")
+        if self.lctserver.tight_volume(threshold, tryIndex=tryIndex):
+            if tryIndex is None:
+                self.completedSuccessfully()
+        
+        progressDialog.close()
+        QApplication.restoreOverrideCursor()
+        
+        """
+        print("medianFilter...")
+        if self.threeD_radio.isChecked():
+            if self.lctserver.MedianFilter(threshold, windowSize, tryIndex):
+                if tryIndex is None:
+                    self.completedSuccessfully()
+        else:
+            if self.lctserver.MedianFilter2D(threshold, windowSize, tryIndex):
+                if tryIndex is None:
+                    self.completedSuccessfully()
+        
+        progressDialog.close()
+        QApplication.restoreOverrideCursor()
+        
+        if tryIndex is None and self.lctserver.f is not None:
+            self.leapct.display(self.lctserver.f)
+        """
+    
 
 class FBPParametersPage(AlgorithmParameterPage):
     def __init__(self, parent = None):
@@ -1185,10 +1316,17 @@ class TVdenoisingParametersPage(AlgorithmParameterPage):
         beta_label = QLabel("<div align='right'>beta</div>")
         numIter_label = QLabel("<div align='right'>num iter</div>")
         p_label = QLabel("<div align='right'>p</div>")
+        
         self.delta_edit = QLineEdit("0.001")
         self.beta_edit = QLineEdit("1.0e-1")
         self.numIter_edit = QLineEdit("20")
         self.p_edit = QLineEdit("1.2")
+        
+        if self.lctserver.object_model is not None and self.lctserver.reference_energy > 0.0:
+            mu = self.lctserver.physics.mu(self.lctserver.object_model[0], self.lctserver.reference_energy, self.lctserver.object_model[1])
+            self.delta_edit.setText(str(mu/20.0))
+            self.p_edit.setText(str(1.0))
+        
         overall_layout.addWidget(delta_label, 0, 0)
         overall_layout.addWidget(self.delta_edit, 0, 1)
         overall_layout.addWidget(beta_label, 1, 0)
@@ -1278,3 +1416,56 @@ class TVdenoisingParametersPage(AlgorithmParameterPage):
         if tryIndex is None and self.lctserver.f is not None:
             self.leapct.display(self.lctserver.f)
         
+
+class SaveVolumeDataParametersPage(AlgorithmParameterPage):
+    def __init__(self, parent = None):
+        super(SaveVolumeDataParametersPage, self).__init__(parent)
+        
+        self.parent = parent
+        
+        overall_layout = QGridLayout()
+        
+        # Add the help/preview/execute button box in the lower right corner:
+        exe_buttons_layout = QHBoxLayout()
+        exe_buttons_layout.addWidget(self.buttonBox)
+        exe_buttons_layout.addStretch(1)
+        
+        overall_vlayout = QVBoxLayout()
+        overall_vlayout.addLayout(overall_layout)
+        overall_vlayout.addLayout(exe_buttons_layout)
+        overall_vlayout.addStretch(1)
+
+        self.buttonBox.previewButton.setEnabled(False)
+        self.setLayout(overall_vlayout)
+        
+        self.buttonBox.helpButton.clicked.connect(self.help_button_Clicked)
+        self.buttonBox.previewButton.clicked.connect(self.preview_button_Clicked)
+        self.buttonBox.executeButton.clicked.connect(self.execute_button_Clicked)
+        
+    def help_button_Clicked(self):
+        pass
+        
+    def preview_button_Clicked(self):
+        pass
+    
+    def execute_button_Clicked(self):
+        if self.computeState == 0:
+            self.execute_algorithm()
+    
+    def execute_algorithm(self):
+        if self.parent.runningPreviousAlgorithms == False:
+            if self.parent.runPreviousAlgorithms() == False:
+                return
+        
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        progressDialog = ProgressDialog(self.parent, "saving volume data...")
+        progressDialog.setModal(True)
+        progressDialog.show()
+        
+        print("saving volume data...")
+        if self.lctserver.save_volume(update_params=True) is not None:
+            self.lctserver.save_parameters()
+            self.completedSuccessfully()
+            
+        progressDialog.close()
+        QApplication.restoreOverrideCursor()
