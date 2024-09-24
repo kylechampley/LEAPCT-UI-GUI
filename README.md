@@ -1,5 +1,5 @@
 # LEAPCT-UI-GUI
-Beta version 0.1 has been released!
+Beta version 0.3 has been released!
 
 The purpose of this repo is to provide a high level UI and GUI for the [LEAP-CT](https://github.com/LLNL/LEAP/) and [XrayPhysics](https://github.com/kylechampley/XrayPhysics) libraries.
 
@@ -21,15 +21,16 @@ This GUI is similar to the LTT GUI and future releases will add more features th
 Although not required, we also recommend installing the [XrayPhysics](https://github.com/kylechampley/XrayPhysics) package.
 
 
-## Usage
-To launch the LEAP-CT GUI, do 
+## Installation and Usage
+To install the LEAP-CT GUI, do the following
 
 ```
 git clone https://github.com/kylechampley/LEAPCT-UI-GUI.git
 cd LEAPCT-UI-GUI
-python leapctrails/launch_leapctrails.py
+pip install .
 ```
 
+One should now find a clickable file to launch the GUI on their desktop.  For Windows this is a batch file and for Linux this is a shell script.  This file can be moved anywhere one wishes and it will still work.
 
 ## Future Releases
 
