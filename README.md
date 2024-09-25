@@ -10,6 +10,10 @@ The UI part (leapctserver.py) is meant to help with
 
 The GUI, which we call LEAP-CT Rails, is built upon leapctserver.py using PyQt5 to assist in reconstructing real CT datasets.  I promised this GUI several months ago and I wanted to make good on this statement, but please be patient with this version.  There may be several bugs and things may not go as smoothly as you'd like.  Also note that this GUI currently only supports a small subset of the LEAP-CT features.
 
+<p align="center">
+  <img src=https://github.com/kylechampley/LEAPCT-UI-GUI/blob/main/screenshot.png>
+</p>
+
 This GUI is similar to the LTT GUI and future releases will add more features that are similar to the LTT GUI.  Some LTT GUI videos were posted to YouTube several years ago, so if you want to get a glimpse of where we are going with this GUI, see [here](https://www.youtube.com/watch?v=oVcFYh8oB4I).  You can also see [this](https://www.youtube.com/watch?v=VHt2kL85Ews) video for a demo of the XrayPhysics part of the GUI.
 
 
