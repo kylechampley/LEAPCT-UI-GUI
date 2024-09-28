@@ -1,5 +1,5 @@
 # LEAPCT-UI-GUI
-Beta version 0.3 has been released!
+Beta version 0.3 has been released!  Warning: until we release version 1.0, there will be bugs in this software.  Please be patient as we work through these.
 
 The purpose of this repo is to provide a high level UI and GUI for the [LEAP-CT](https://github.com/LLNL/LEAP/) and [XrayPhysics](https://github.com/kylechampley/XrayPhysics) libraries.
 
