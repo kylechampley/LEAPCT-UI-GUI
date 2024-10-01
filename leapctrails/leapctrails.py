@@ -55,6 +55,8 @@ class leapctrails(QMainWindow):
         self.workflowWindow = WorkflowWindow(self.lctserver, "Workflow", self)
         overall_grid.addWidget(self.workflowWindow, 0, 0)
         
+        #self.setWindowIcon(QIcon(os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "LEAPicon_square.png")))
+        
         wid = QWidget(self)
         self.setCentralWidget(wid)
         layout = QVBoxLayout()

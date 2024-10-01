@@ -173,6 +173,7 @@ class SettingsDialogControls(QWidget):
         curRow += 1
         #"""
         
+        """
         bottum_button_layout = QHBoxLayout()
         self.keyboard_button = QPushButton("keyboard")
         self.save_defaults_button = QPushButton("save defaults")
@@ -181,6 +182,27 @@ class SettingsDialogControls(QWidget):
         bottum_button_layout.addWidget(self.keyboard_button)
         bottum_button_layout.addWidget(self.save_defaults_button)
         overallgrid.addLayout(bottum_button_layout, curRow, 0)
+        curRow += 1
+        """
+        
+        self.keyboard_button = QPushButton("keyboard")
+        self.keyboard_button.setMaximumWidth(120)
+        self.keyboard_button.clicked.connect(self.keyboard_button_Clicked)
+        overallgrid.addWidget(self.keyboard_button, curRow, 0)
+        curRow += 1
+        
+        default_button_layout = QHBoxLayout()
+        self.save_defaults_button = QPushButton("save defaults")
+        self.save_defaults_button.clicked.connect(self.save_defaults_button_Clicked)
+        custom_defaults_label = QLabel("custom defaults file:")
+        self.custom_defaults_edit = QLineEdit()
+        self.custom_defaults_browse_button = QPushButton("browse")
+        self.custom_defaults_browse_button.clicked.connect(self.custom_defaults_browse_button_Clicked)
+        default_button_layout.addWidget(self.save_defaults_button)
+        default_button_layout.addWidget(custom_defaults_label)
+        default_button_layout.addWidget(self.custom_defaults_edit)
+        default_button_layout.addWidget(self.custom_defaults_browse_button)
+        overallgrid.addLayout(default_button_layout, curRow, 0)
         curRow += 1
         
         self.setLayout(overallgrid)
@@ -248,7 +270,16 @@ class SettingsDialogControls(QWidget):
         self.memory_edit.setText(str(self.lctserver.max_CPU_memory_usage))
         
     def save_defaults_button_Clicked(self):
-        self.lctserver.save_defaults()
+        self.lctserver.save_defaults(str(self.custom_defaults_edit.text()))
+        
+    def custom_defaults_browse_button_Clicked(self):
+        openFileDialog = QFileDialog()
+        openFileDialog.setFileMode(QFileDialog.AnyFile)
+        openFileDialog.setNameFilters(["Parameter Files (*.txt)"])
+        if openFileDialog.exec_():
+            txtFile = openFileDialog.selectedFiles()
+            inputArg = os.path.abspath(str(txtFile[0]))
+            self.custom_defaults_edit.setText(inputArg)
     
     def gpu_clicked(self):
         gpuList = []

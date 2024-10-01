@@ -13,10 +13,13 @@ package_path = get_python_lib()
 platform_name = platform.system()
 if platform_name == 'Linux':
     desktop_path = os.path.join(os.path.join(os.path.expanduser('~')), 'Desktop')
+    if os.path.isdir('desktop_path') == False:
+        desktop_path = os.path.join(os.path.expanduser('~'))
     f = open(os.path.join(desktop_path, 'leapctrails.sh'), "w")
     f.write('#!/bin/sh\n')
     f.write('python ' + str(os.path.join(package_path, 'leapctrails', 'launch_leapctrails.py')) + '\n')
     f.close()
+    os.chmod(os.path.join(desktop_path, 'leapctrails.sh'), 0o755)
 elif platform_name == 'Windows':
     desktop_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
     f = open(os.path.join(desktop_path, 'leapctrails.bat'), "w")

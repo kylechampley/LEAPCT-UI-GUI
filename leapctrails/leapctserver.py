@@ -164,7 +164,7 @@ class leapctserver:
         self.reset()
         self.leapct.reset()
         
-    def save_defaults(self):
+    def save_defaults(self, additionalFile=None):
         defaults_file = os.path.join(root_path, "leapctserver_defaults.txt")
         f = open(defaults_file, "w")
         
@@ -175,11 +175,14 @@ class leapctserver:
         f.write(','.join(str(i) for i in data))
         f.write(']\n')
         
-        f.write('numTVneighbors = ' + str(self.get_numTVneighbors()) + '\n')
-        f.write('backprojector = ' + str(self.get_projector()) + '\n')
+        f.write('numTVneighbors = ' + str(self.leapct.get_numTVneighbors()) + '\n')
+        f.write('backprojector = ' + str(self.leapct.get_projector()) + '\n')
         
         if self.default_algorithms is not None and len(self.default_algorithms) > 0:
             f.write('default_algorithms = ' + str(self.default_algorithms) + '\n')
+        
+        if additionalFile is not None and len(additionalFile) > 0 and os.path.isfile(additionalFile):
+            f.write(additionalFile + '\n')
         
         f.close()
         print('leapctserver defaults saved to: ' + str(defaults_file))
@@ -615,10 +618,10 @@ class leapctserver:
                 g = np.zeros((inds[1]-inds[0]+1, self.leapct.get_numRows(), self.leapct.get_numCols()),dtype=np.float32)
             else:
                 g = np.zeros((self.leapct.get_numAngles(), self.leapct.get_numRows(), self.leapct.get_numCols()),dtype=np.float32)
-            g = np.swapaxes(g, 0, 1)
-            g = self.leapct.load_data(fullPath, x=g, fileRange=None, rowRange=inds, colRange=None)
-            g = np.swapaxes(g, 0, 1)
-            g = np.ascontiguousarray(g, dtype=np.float32)
+            #g = np.swapaxes(g, 0, 1)
+            self.leapct.load_data(fullPath, x=g, fileRange=None, rowRange=inds, colRange=None, axis_split=1)
+            #g = np.swapaxes(g, 0, 1)
+            #g = np.ascontiguousarray(g, dtype=np.float32)
             """
             elif baseFileName.find('*') != -1:
                 import imageio
@@ -662,19 +665,19 @@ class leapctserver:
                     return None
                 fileName = self.projection_file
         fullPath = os.path.join(self.path, fileName)
-        if os.path.isfile(fullPath) == False:
-            print('Error: ' + str(fullPath) + ' does not exist!')
-            return None
+        #if os.path.isfile(fullPath) == False:
+        #    print('Error: ' + str(fullPath) + ' does not exist!')
+        #    return None
         dataFolder, baseFileName = os.path.split(fullPath)
         if "sino" in baseFileName:
             if inds is not None:
                 g = np.zeros((self.leapct.get_numAngles(), inds[1]-inds[0]+1, self.leapct.get_numCols()),dtype=np.float32)
             else:
                 g = np.zeros((self.leapct.get_numAngles(), self.leapct.get_numRows(), self.leapct.get_numCols()),dtype=np.float32)
-            g = np.swapaxes(g, 0, 1)
-            g = self.leapct.load_data(fullPath, x=g, fileRange=inds, rowRange=None, colRange=None)
-            g = np.swapaxes(g, 0, 1)
-            g = np.ascontiguousarray(g, dtype=np.float32)
+            #g = np.swapaxes(g, 0, 1)
+            g = self.leapct.load_data(fullPath, x=g, fileRange=inds, rowRange=None, colRange=None, axis_split=1)
+            #g = np.swapaxes(g, 0, 1)
+            #g = np.ascontiguousarray(g, dtype=np.float32)
         else:
             g = self.leapct.load_data(fullPath, x=None, fileRange=None, rowRange=inds, colRange=None)
         #self.g = g # ?
@@ -700,16 +703,8 @@ class leapctserver:
         #    fileName = self.raw_scan_file
         #else:
         #    fileName = self.projection_file
-        if self.data_type == self.RAW:
-            fileName = 'raw.tif'
-        elif self.data_type == self.RAW_DARK_SUBTRACTED:
-            fileName = 'rawDarkSub.tif'
-        elif self.data_type == self.TRANSMISSION:
-            fileName = 'transRad.tif'
-        elif self.data_type == self.ATTENUATION:
-            fileName = 'attenRad.tif'
-        else:
-            fileName = 'image.tif'
+        fileName = self.get_default_projection_file_name()
+        
         if self.outputDir in fileName:
             newFileName = fileName
         else:
@@ -758,6 +753,9 @@ class leapctserver:
             
     def load_volume(self, fileName, inds):
         if fileName is None:
+            if self.reconstruction_file is None or len(self.reconstruction_file) == 0:
+                print('Error: reconstruction_file is not defined!')
+                return None
             fileName = self.reconstruction_file
         fullPath = os.path.join(self.path, fileName)
         #if os.path.isfile(fullPath) == False:
@@ -766,7 +764,19 @@ class leapctserver:
         f = self.leapct.load_data(fullPath, x=None, fileRange=inds, rowRange=None, colRange=None)
         return f
         
-    def save_projection_rows(self, g, seq_offset=0):
+    def get_default_projection_file_name(self):
+        if self.data_type == self.RAW:
+            return 'raw.tif'
+        elif self.data_type == self.RAW_DARK_SUBTRACTED:
+            return 'rawDarkSub.tif'
+        elif self.data_type == self.TRANSMISSION:
+            return 'transRad.tif'
+        elif self.data_type == self.ATTENUATION:
+            return 'attenRad.tif'
+        else:
+            return 'image.tif'
+    
+    def save_projection_rows(self, g, seq_offset=0, update_params=False):
         """Saves the projection data in a sequence of tif files, one file for each detector row
         
         Args:
@@ -792,13 +802,19 @@ class leapctserver:
             newFileName = fileName
         else:
             newFileName = os.path.join(self.outputDir, fileName)
-        fullPath = os.path.join(self.path, fileName)
+        fullPath = os.path.join(self.path, newFileName)
         
-        g = np.swapaxes(g, 0, 1)
-        isSuccessful = self.leapct.save_projections(fullPath, g, seq_offset)
-        g = np.swapaxes(g, 0, 1)
-        g = np.ascontiguousarray(g, dtype=np.float32)
-        if isSuccessful:
+        #g = np.swapaxes(g, 0, 1)
+        #isSuccessful = self.leapct.save_projections(fullPath, g, seq_offset, axis_split=1)
+        #g = np.swapaxes(g, 0, 1)
+        #g = np.ascontiguousarray(g, dtype=np.float32)
+        
+        if self.leapct.save_projections(fullPath, g, seq_offset, axis_split=1) == True:
+            if update_params:
+                if self.data_type == self.TRANSMISSION or self.data_type == self.ATTENUATION:
+                    self.projection_file = newFileName
+                else:
+                    self.raw_scan_file = newFileName
             return newFileName
         else:
             return None
@@ -998,7 +1014,7 @@ class leapctserver:
             if self.num_proj * self.projection_memory() < self.max_CPU_memory_usage - self.scratch_space:
                 self.chunk_size = self.leapct.get_numAngles()
             else:
-                numAngles = self.get_numAngles()
+                numAngles = self.leapct.get_numAngles()
                 #chunk_size * self.num_proj * self.projection_memory() / float(numAngles) = self.max_CPU_memory_usage - self.scratch_space
                 self.chunk_size = int(float((self.max_CPU_memory_usage - self.scratch_space) * float(numAngles) / (self.num_proj * self.projection_memory())))
                 
@@ -1014,7 +1030,7 @@ class leapctserver:
             if self.num_proj * self.projection_memory() < self.max_CPU_memory_usage - self.scratch_space:
                 self.chunk_size = self.leapct.get_numRows()
             else:
-                numRows = self.get_numRows()
+                numRows = self.leapct.get_numRows()
                 self.chunk_size = int(float((self.max_CPU_memory_usage - self.scratch_space) * float(numRows) / (self.num_proj * self.projection_memory())))
                 
                 numChunks = int(np.ceil(float(numRows)/float(self.chunk_size)))
@@ -1463,58 +1479,29 @@ class leapctserver:
             return False
         
     def outlierCorrection(self, threshold=0.03, windowSize=3, tryIndex=None):
-        if self.leapct.ct_geometry_defined() == False:
-            print('Error: CT geometry not defined!')
+        if self.data_type != self.ATTENUATION:
+            print('Error: this algorithm currently only implemented for attenuation data')
             return False
-        if self.data_type == self.ATTENUATION:
-            if tryIndex is None:
-                if self.g is None:
-                    self.g = self.load_projections()
-                    if self.g is None:
-                        print('Error: failed to load data')
-                        return False
-                return leap_preprocessing_algorithms.outlierCorrection(self.leapct, self.g, threshold, windowSize, isAttenuationData=True)
-            else:
-                aProj = self.grab_single_projection(tryIndex)
-                if aProj is None:
-                    return False
-                    
-                if leap_preprocessing_algorithms.outlierCorrection(self.leapct, aProj, threshold, windowSize, isAttenuationData=True) == True:
-                    self.lastImage = np.squeeze(aProj)
-                    return True
-                else:
-                    self.lastImage = None
-                    return False
-        else:
-            print('Error: outlier correction current only implemented for attenuation data')
-            return False
+        self.chunking_type = self.PROJECTION
+        self.numOverlap = 0
+        self.num_vol = 0
+        self.num_proj = 1
+        algorithm = lambda g: leap_preprocessing_algorithms.outlierCorrection(self.leapct, g, threshold, windowSize, isAttenuationData=True)
+            
+        return self.projection_processing(algorithm, tryIndex)
+        
         
     def outlierCorrection_highEnergy(self, tryIndex=None):
-        if self.leapct.ct_geometry_defined() == False:
-            print('Error: CT geometry not defined!')
+        if self.data_type != self.ATTENUATION:
+            print('Error: this algorithm currently only implemented for attenuation data')
             return False
-        if self.data_type == self.ATTENUATION:
-            if tryIndex is None:
-                if self.g is None:
-                    self.g = self.load_projections()
-                    if self.g is None:
-                        print('Error: failed to load data')
-                        return False
-                return leap_preprocessing_algorithms.outlierCorrection_highEnergy(self.leapct, self.g, isAttenuationData=True)
-            else:
-                aProj = self.grab_single_projection(tryIndex)
-                if aProj is None:
-                    return False
-                    
-                if leap_preprocessing_algorithms.outlierCorrection_highEnergy(self.leapct, aProj, isAttenuationData=True) == True:
-                    self.lastImage = np.squeeze(aProj)
-                    return True
-                else:
-                    self.lastImage = None
-                    return False
-        else:
-            print('Error: outlier correction current only implemented for attenuation data')
-            return False
+        self.chunking_type = self.PROJECTION
+        self.numOverlap = 0
+        self.num_vol = 0
+        self.num_proj = 1
+        algorithm = lambda g: leap_preprocessing_algorithms.outlierCorrection_highEnergy(self.leapct, g, isAttenuationData=True)
+        
+        return self.projection_processing(algorithm, tryIndex)
         
     def detectorDeblur_FourierDeconv(self, H, WienerParam=0.0):
         #leap_preprocessing_algorithms.detectorDeblur_FourierDeconv(self.leapct, ...)
@@ -1527,6 +1514,9 @@ class leapctserver:
     def find_centerCol(self, iRow=-1):
         if self.leapct.ct_geometry_defined() == False:
             print('Error: CT geometry not defined!')
+            return False
+        if self.projection_memory() >= self.max_CPU_memory_usage:
+            print('Error: not enough memory for this operation!')
             return False
         if self.data_type == self.ATTENUATION:
             if self.g is None:
@@ -1544,6 +1534,9 @@ class leapctserver:
         if self.leapct.ct_geometry_defined() == False:
             print('Error: CT geometry not defined!')
             return False
+        if self.projection_memory() >= self.max_CPU_memory_usage:
+            print('Error: not enough memory for this operation!')
+            return False
         if self.data_type == self.ATTENUATION:
             if self.g is None:
                 self.g = self.load_projections()
@@ -1560,6 +1553,9 @@ class leapctserver:
         if self.leapct.ct_geometry_defined() == False:
             print('Error: CT geometry not defined!')
             return 0.0
+        if self.projection_memory() >= self.max_CPU_memory_usage:
+            print('Error: not enough memory for this operation!')
+            return False
         if self.data_type == self.ATTENUATION:
             if self.g is None:
                 self.g = self.load_projections()
@@ -1572,125 +1568,107 @@ class leapctserver:
             return 0.0
     
     def ringRemoval(self, delta=0.01, beta=1.0e3, numIter=30, maxChange=0.05, which='fast', tryIndex=None):
-        if self.leapct.ct_geometry_defined() == False:
-            print('Error: CT geometry not defined!')
-            return False
-        if self.data_type == self.ATTENUATION:
-            if tryIndex is None:
-                if self.g is None:
-                    self.g = self.load_projections()
-                    if self.g is None:
-                        print('Error: failed to load data')
-                        return False
-                if which == 'fast':
-                    return leap_preprocessing_algorithms.ringRemoval_fast(self.leapct, self.g, delta, beta, numIter, maxChange)
-                else:
-                    return leap_preprocessing_algorithms.ringRemoval(self.leapct, self.g, delta, beta, numIter, maxChange)
-            else:
-                iz = tryIndex
-                if iz < 0 or iz >= self.leapct.get_numZ():
-                    iz = self.leapct.get_numZ()//2
-                #g_ROI = self.g.copy()
-                #rowRange = [0, g_ROI.shape[1]-1]
-                g_ROI, rowRange = self.grab_necessary_sinograms_for_reconstruction(iz, 3)
-                print(rowRange)
-                if g_ROI is None:
-                    print('Error: failed to load data')
-                    return False
-                
-                g_copy = g_ROI.copy()
-                if which == 'fast':
-                    leap_preprocessing_algorithms.ringRemoval_fast(self.leapct, g_ROI, delta, beta, numIter, maxChange)
-                else:
-                    leap_preprocessing_algorithms.ringRemoval(self.leapct, g_ROI, delta, beta, numIter, maxChange)
-                #self.lastImage = np.squeeze(g_copy[:,g_copy.shape[1]//2,:] - g_ROI[:,g_copy.shape[1]//2,:])
-                self.leapct_backup.copy_parameters(self.leapct)
-                self.leapct_backup.crop_projections(rowRange)
-                f_slice = self.leapct_backup.FBP_slice(g_ROI, iz)
-                del g_ROI
-                self.lastImage = np.squeeze(f_slice)
-                
-                return True
-        else:
-            print('Error: ring removal current only implemented for attenuation data')
-            return False
+        self.chunking_type = self.DETECTOR_ROW
+        self.numOverlap = 3
+        self.num_vol = 0
         
-    def ringRemoval_median(self, threshold=0.0, windowSize=5, numIter=1):
-        if self.leapct.ct_geometry_defined() == False:
-            print('Error: CT geometry not defined!')
-            return False
-        if self.data_type == self.ATTENUATION:
-            if self.g is None:
-                self.g = self.load_projections()
-                if self.g is None:
-                    print('Error: failed to load data')
-                    return False
-            return leap_preprocessing_algorithms.ringRemoval_median(self.leapct, self.g, threshold, windowSize, numIter)
+        #algorithm = lambda f: self.leapct.MedianFilter(f, threshold, windowSize)
+        if which == 'fast':
+            self.num_proj = 1
+            algorithm = lambda g: leap_preprocessing_algorithms.ringRemoval_fast(self.leapct, g, delta, beta, numIter, maxChange)
         else:
-            print('Error: ring removal current only implemented for attenuation data')
-            return False
-        
-    def parameter_sweep(self, values, param='centerCol', iz=None, algorithmName='FBP'):
-        if self.leapct.all_defined() == False:
-            print('Error: CT geometry and CT volume must be defined before running this algorithm!')
-            return False
-        if self.data_type == self.ATTENUATION:
-            if self.g is None:
-                self.g = self.load_projections()
-                if self.g is None:
-                    print('Error: failed to load data')
-                    return False
-            f_stack = leap_preprocessing_algorithms.parameter_sweep(self.leapct, self.g, values, param, iz, algorithmName)
-            if f_stack is None:
-                return False
-            else:
-                if f_stack.shape[0] == 1 or len(f_stack.shape) == 2:
-                    plt.imshow(np.squeeze(f_stack), cmap='gray', interpolation='nearest')
-                    plt.show()
-                else:
-                    self.leapct.display(f_stack)
-                return True
-        else:
-            print('Error: parameter_sweep current only implemented for attenuation data')
-            return False
-    
-    def polynomialBHC(self, coeffs, tryIndex=None):
-        if self.leapct.ct_geometry_defined() == False:
-            print('Error: CT geometry not defined!')
-            return False
-        if coeffs is None:
-            print('Error: must define the polynomial coefficients for BHC')
+            self.num_proj = 3
+            algorithm = lambda g: leap_preprocessing_algorithms.ringRemoval(self.leapct, g, delta, beta, numIter, maxChange)
             
-        if self.data_type == self.ATTENUATION:
+        return self.sinogram_processing(algorithm, tryIndex)
+    
+        """
+        if self.leapct.ct_geometry_defined() == False:
+            print('Error: CT geometry not defined!')
+            return False
+        if self.data_type != self.ATTENUATION:
+            print('Error: ring removal current only implemented for attenuation data')
+            return False
+        if tryIndex is None:
             if self.g is None:
                 self.g = self.load_projections()
                 if self.g is None:
                     print('Error: failed to load data')
                     return False
+            if which == 'fast':
+                return leap_preprocessing_algorithms.ringRemoval_fast(self.leapct, self.g, delta, beta, numIter, maxChange)
+            else:
+                return leap_preprocessing_algorithms.ringRemoval(self.leapct, self.g, delta, beta, numIter, maxChange)
         else:
-            print('Error: polynomialBHC current only implemented for attenuation data')
-            return False
-
-        if tryIndex is not None:
             iz = tryIndex
             if iz < 0 or iz >= self.leapct.get_numZ():
                 iz = self.leapct.get_numZ()//2
-            g_ROI, rowRange = self.grab_necessary_sinograms_for_reconstruction(iz)
+            #g_ROI = self.g.copy()
+            #rowRange = [0, g_ROI.shape[1]-1]
+            g_ROI, rowRange = self.grab_necessary_sinograms_for_reconstruction(iz, 3)
+            print(rowRange)
             if g_ROI is None:
                 print('Error: failed to load data')
                 return False
             
-            self.apply_polynomial(g_ROI, coeffs)
+            #g_copy = g_ROI.copy()
+            if which == 'fast':
+                leap_preprocessing_algorithms.ringRemoval_fast(self.leapct, g_ROI, delta, beta, numIter, maxChange)
+            else:
+                leap_preprocessing_algorithms.ringRemoval(self.leapct, g_ROI, delta, beta, numIter, maxChange)
+            #self.lastImage = np.squeeze(g_copy[:,g_copy.shape[1]//2,:] - g_ROI[:,g_copy.shape[1]//2,:])
             self.leapct_backup.copy_parameters(self.leapct)
             self.leapct_backup.crop_projections(rowRange)
             f_slice = self.leapct_backup.FBP_slice(g_ROI, iz)
             del g_ROI
             self.lastImage = np.squeeze(f_slice)
-
-        else:
-            self.apply_polynomial(self.g, coeffs)
+            
+            return True
+            """
         
-        return True
+    def ringRemoval_median(self, threshold=0.0, windowSize=5, numIter=1, tryIndex=None):
+        self.chunking_type = self.DETECTOR_ROW
+        self.numOverlap = 0
+        self.num_vol = 0
+        self.num_proj = 2
+        algorithm = lambda g: leap_preprocessing_algorithms.ringRemoval_median(self.leapct, g, threshold, windowSize, numIter)
+        return self.sinogram_processing(algorithm, tryIndex)
+        
+    def parameter_sweep(self, values, param='centerCol', iz=None, algorithmName='FBP'):
+        if self.leapct.all_defined() == False:
+            print('Error: CT geometry and CT volume must be defined before running this algorithm!')
+            return False
+        if self.data_type != self.ATTENUATION:
+            print('Error: parameter_sweep current only implemented for attenuation data')
+            return False
+        if self.projection_memory() >= self.max_CPU_memory_usage:
+            print('Error: not enough memory for this operation!')
+            return False
+        if self.g is None:
+            self.g = self.load_projections()
+            if self.g is None:
+                print('Error: failed to load data')
+                return False
+        f_stack = leap_preprocessing_algorithms.parameter_sweep(self.leapct, self.g, values, param, iz, algorithmName)
+        if f_stack is None:
+            return False
+        else:
+            if f_stack.shape[0] == 1 or len(f_stack.shape) == 2:
+                plt.imshow(np.squeeze(f_stack), cmap='gray', interpolation='nearest')
+                plt.show()
+            else:
+                self.leapct.display(f_stack)
+            return True
+    
+    def polynomialBHC(self, coeffs, tryIndex=None):
+        if coeffs is None:
+            print('Error: must define the polynomial coefficients for BHC')
+        self.chunking_type = self.DETECTOR_ROW
+        self.numOverlap = 0
+        self.num_vol = 0
+        self.num_proj = 1
+        algorithm = lambda g: self.apply_polynomial(g, coeffs)
+        return self.sinogram_processing(algorithm, tryIndex)
     
     def apply_polynomial(self, g, coeffs):
     
@@ -1714,9 +1692,6 @@ class leapctserver:
         if has_physics == False:
             print('Error: BHC requires the XrayPhysics package!')
             return False
-        if self.leapct.ct_geometry_defined() == False:
-            print('Error: CT geometry not defined!')
-            return False
         if self.source_spectra_defined() == False:
             print('Error: spectra not defined!')
         if material is None:
@@ -1725,53 +1700,256 @@ class leapctserver:
             else:
                 print('Error: must define material for BHC')
                 return False
-            
-        if self.data_type == self.ATTENUATION:
+                
+        Es, s_total = self.totalSystemSpectralResponse()
+        if self.reference_energy is None or self.reference_energy < Es[0] or self.reference_energy > Es[-1]:
+            self.reference_energy = self.physics.meanEnergy(s_total, Es)
+        BHC_LUT, T_lut = self.physics.setBHClookupTable(s_total, Es, material, self.reference_energy)
+        if BHC_LUT is None:
+            return False        
         
-            Es, s_total = self.totalSystemSpectralResponse()
-            if self.reference_energy is None or self.reference_energy < Es[0] or self.reference_energy > Es[-1]:
-                self.reference_energy = self.physics.meanEnergy(s_total, Es)
-            BHC_LUT, T_lut = self.physics.setBHClookupTable(s_total, Es, material, self.reference_energy)
-            if BHC_LUT is None:
-                return False
+        self.chunking_type = self.DETECTOR_ROW
+        self.numOverlap = 0
+        self.num_vol = 0
+        self.num_proj = 1
+        algorithm = lambda g: self.leapct.applyTransferFunction(g, BHC_LUT, T_lut)
+        return self.sinogram_processing(algorithm, tryIndex)
             
-            if tryIndex is not None:
-                iz = tryIndex
-                if iz < 0 or iz >= self.leapct.get_numZ():
-                    iz = self.leapct.get_numZ()//2
-                g_ROI, rowRange = self.grab_necessary_sinograms_for_reconstruction(iz)
-                if g_ROI is None:
-                    print('Error: failed to load data')
-                    return False
-                
-                self.leapct.applyTransferFunction(g_ROI, BHC_LUT, T_lut)
-                self.leapct_backup.copy_parameters(self.leapct)
-                self.leapct_backup.crop_projections(rowRange)
-                f_slice = self.leapct_backup.FBP_slice(g_ROI, iz)
-                del g_ROI
-                self.lastImage = np.squeeze(f_slice)
-                
-                return True
-                
-            else:
-                if self.g is None:
-                    self.g = self.load_projections()
-                    if self.g is None:
-                        print('Error: failed to load data')
-                        return False
-
-                self.leapct.applyTransferFunction(self.g, BHC_LUT, T_lut)
-                return True
-            
-        else:
-            print('Error: singleMaterialBHC current only implemented for attenuation data')
+    
+    def projection_processing_setup(self, tryIndex=None):
+        if self.leapct.ct_geometry_defined() == False:
+            print('Error: CT geometry must be defined before running this algorithm!')
             return False
             
-    def projection_processing(self, algorithm, tryIndex=None):
-        pass
+        self.chunking_type = self.PROJECTION
+        self.num_vol = 0
+        self.num_proj = max(1, self.num_proj)
+        self.numOverlap = max(0, self.numOverlap)
         
-    def sinogram_processing(self):
-        pass
+        if tryIndex is None:
+            # Need to process the entire set of projections
+            if self.num_proj*self.projection_memory() >= self.max_CPU_memory_usage:
+                # not enough memory for this operation, so clear any memory currently being used
+                self.clear_volume_data()
+                if self.g is not None:
+                    # save projection data first
+                    print('Saving projection data to disk...')
+                    self.save_projection_angles(self.g, update_params=True)
+                    self.clear_projection_data_data()
+                    
+                self.set_chunk_size()
+                self.create_outputDir() # do I really need to do this?
+                return True
+            else:
+                # there is enough memory to perform operation in one chunk
+                if self.memory_used_by_array(self.f) + self.num_proj*self.projection_memory() >= self.max_CPU_memory_usage:
+                    # clear volume data memory because it pushes us past the limit
+                    self.clear_volume_data()
+                if self.g is None:
+                    if self.data_type == self.TRANSMISSION or self.data_type == self.ATTENUATION:
+                        input_file = self.projection_file
+                    else:
+                        input_file = self.raw_scan_file
+                    self.g = self.load_projection_angles(input_file)
+                if self.g is None:
+                    print('Error: failed to load data')
+                    return False
+        else:
+            return True
+    
+    def projection_processing(self, algorithm, tryIndex=None):
+        if self.projection_processing_setup(tryIndex) == False:
+            return False
+        
+        if self.data_type == self.TRANSMISSION or self.data_type == self.ATTENUATION:
+            input_file = self.projection_file
+        else:
+            input_file = self.raw_scan_file
+        
+        if tryIndex is None:
+            # Need to process the entire set of projections
+            numAngles = self.leapct.get_numAngles()
+            numChunks = int(np.ceil(float(numAngles)/float(self.chunk_size)))
+            if self.chunk_size < numAngles:
+                
+                print('Performing algorithm in ' + str(numChunks) + ' chunks of ' + str(self.chunk_size) + ' slices...')
+                
+                for n in range(numChunks):
+                    print('processing chunk ' + str(n+1) + ' of ' + str(numChunks))
+                    
+                    angleStart = n*self.chunk_size
+                    angleEnd = min(numAngles-1, angleStart + self.chunk_size - 1)
+                    
+                    #print('reading ' + str(input_file) + '...')
+                    g_chunk = self.load_projection_angles(input_file, [angleStart, angleEnd])
+                    if g_chunk is None:
+                        print('failed to load projections!')
+                        return False
+                        
+                    if algorithm(g_chunk) == False:
+                        return False
+                    
+                    if n == numChunks-1:
+                        update_params = True
+                    else:
+                        update_params = False
+                    
+                    self.save_projection_angles(g_chunk, angleStart, update_params=update_params)
+                    if update_params:
+                        self.save_parameters()
+                    del g_chunk
+                
+                return True
+            else:
+                if self.g is None:
+                    # data should have been loaded by projection_processing_setup
+                    print('Error: failed to load data')
+                    return False
+                return algorithm(self.g)
+        else:
+            iAngle = tryIndex
+            if iAngle < 0 or iAngle >= self.leapct.get_numAngles():
+                iAngle = 0
+                
+            aProj = self.grab_single_projection(iAngle)
+            if aProj is None:
+                print('Error: failed to load data')
+                return False
+            algorithm(aProj)
+            self.lastImage = np.squeeze(aProj)
+            
+            return True
+        
+    def sinogram_processing(self, algorithm, tryIndex=None):
+        if self.leapct.ct_geometry_defined() == False:
+            print('Error: CT geometry must be defined before running this algorithm!')
+            return False
+        if self.data_type != self.ATTENUATION:
+            print('Error: data_type must be ATTENUATION for this algorithm')
+            return False
+        
+        self.chunking_type = self.DETECTOR_ROW
+        self.num_vol = 0
+        self.num_proj = max(1, self.num_proj)
+        self.numOverlap = max(0, self.numOverlap)
+        
+        if tryIndex is None:
+            # Need to process all detector rows
+            if self.num_proj*self.projection_memory() >= self.max_CPU_memory_usage:
+                # not enough memory for this operation, so clear any memory currently being used
+                self.clear_volume_data()
+                if self.g is not None:
+                    # save projection data first
+                    print('Saving projection data to disk...')
+                    self.save_projection_rows(self.g, update_params=True)
+                    self.clear_projection_data_data()
+                    
+                ############################################################################################
+                self.set_chunk_size()
+                self.create_outputDir() # do I really need to do this?
+                
+                numRows = self.leapct.get_numRows()
+                numChunks = int(np.ceil(float(numRows)/float(self.chunk_size)))
+                
+                print('Performing algorithm in ' + str(numChunks) + ' chunks of ' + str(self.chunk_size) + ' slices...')
+                
+                if self.numOverlap > 0:
+                    g_lastRows = np.zeros((self.leapct.get_numAngles(), self.numOverlap, self.leapct.get_numCols()), dtype=np.float32)
+                else:
+                    g_lastRows = None
+                    
+                last_row = None
+                for n in range(numChunks):
+                    print('processing chunk ' + str(n+1) + ' of ' + str(numChunks))
+                    
+                    rowStart = n*self.chunk_size
+                    rowEnd = min(numRows-1, rowStart + self.chunk_size - 1)
+                    
+                    rowStart_pad = max(0, rowStart - self.numOverlap)
+                    rowEnd_pad = min(numRows-1, rowEnd + self.numOverlap)
+                    
+                    padded_left_rows = []
+                    padded_right_rows = []
+                    if rowStart_pad < rowStart:
+                        padded_left_rows = list(range(rowStart_pad-rowStart_pad, rowStart-rowStart_pad))
+                    if rowEnd_pad > rowEnd:
+                        padded_right_rows = list(range(rowEnd+1-rowStart_pad, rowEnd_pad+1-rowStart_pad))
+                    padded_rows = padded_left_rows + padded_right_rows
+                    
+                    print('reading ' + str(self.projection_file) + '...')
+                    g_chunk = self.load_projection_rows(self.projection_file, [rowStart_pad, rowEnd_pad])
+                    if g_chunk is None:
+                        print('failed to load rows!')
+                        
+                    if self.numOverlap >= 1:
+                        if n > 0:
+                            g_chunk[:,0:self.numOverlap,:] = g_lastRows[:]
+                        if n < numChunks-1:
+                            g_lastRows[:] = g_chunk[:,g_chunk.shape[1]-self.numOverlap:g_chunk.shape[1],:]
+                        
+                    algorithm(g_chunk)
+                    
+                    #if n == 1:
+                    #    self.leapct.display(g_chunk)
+                    
+                    # Perform single-slice feathering between slabs
+                    if self.numOverlap >= 1:
+                        if last_row is not None:
+                            g_chunk[:,self.numOverlap,:] = 0.5*(last_row[:,:] + g_chunk[:,self.numOverlap,:])
+                        
+                        last_row = np.zeros((g_chunk.shape[0], g_chunk.shape[2]), dtype=np.float32)
+                        last_row[:,:] = g_chunk[:,g_chunk.shape[1]-self.numOverlap,:]
+                            
+                    if len(padded_rows) > 0:
+                        g_chunk = np.delete(g_chunk, padded_rows, axis=1)
+                    
+                    if n == numChunks-1:
+                        update_params = True
+                    else:
+                        update_params = False
+                    
+                    self.save_projection_rows(g_chunk, rowStart, update_params=update_params)
+                    if update_params:
+                        self.save_parameters()
+                    del g_chunk
+                
+                return True
+            else:
+                # there is enough memory to perform operation in one chunk
+                if self.memory_used_by_array(self.f) + self.num_proj*self.projection_memory() >= self.max_CPU_memory_usage:
+                    # clear volume data memory because it pushes us past the limit
+                    self.clear_volume_data()
+                if self.g is None:
+                    self.g = self.load_projection_angles(self.projection_file)
+                if self.g is None:
+                    print('Error: failed to load data')
+                    return False
+                return algorithm(self.g)
+        else:
+            if self.leapct.ct_volume_defined() == False:
+                print('Error: CT volume parameters must be defined!')
+                return False
+            iz = tryIndex
+            if iz < 0 or iz >= self.leapct.get_numZ():
+                iz = self.leapct.get_numZ()//2
+            #g_ROI = self.g.copy()
+            #rowRange = [0, g_ROI.shape[1]-1]
+            g_ROI, rowRange = self.grab_necessary_sinograms_for_reconstruction(iz, self.numOverlap)
+            #print(rowRange)
+            if g_ROI is None:
+                print('Error: failed to load data')
+                return False
+            
+            #g_copy = g_ROI.copy()
+            algorithm(g_ROI)
+            #self.lastImage = np.squeeze(g_copy[:,g_copy.shape[1]//2,:] - g_ROI[:,g_copy.shape[1]//2,:])
+            self.leapct_backup.copy_parameters(self.leapct)
+            self.leapct_backup.crop_projections(rowRange)
+            f_slice = self.leapct_backup.FBP_slice(g_ROI, iz)
+            del g_ROI
+            self.lastImage = np.squeeze(f_slice)
+            
+            return True
         
     def reconstruction_slab_processing(self):
         pass
@@ -1780,6 +1958,11 @@ class leapctserver:
         if self.leapct.ct_volume_defined() == False:
             print('Error: CT volume must be defined before running this algorithm!')
             return False
+            
+        self.chunking_type = self.Z_SLICE
+        self.num_proj = 0
+        self.num_vol = max(1, self.num_vol)
+        self.numOverlap = max(0, self.numOverlap)
         
         if tryIndex is None:
             # Need to process the whole volume
@@ -1794,8 +1977,6 @@ class leapctserver:
                     
                 ############################################################################################
                 self.set_chunk_size()
-                output_file = os.path.join(self.outputDir, 'zslice.tif')
-                output_full_path = os.path.join(self.path, output_file)
                 self.create_outputDir() # do I really need to do this?
                 
                 numZ = self.leapct.get_numZ()
@@ -1871,10 +2052,7 @@ class leapctserver:
                 if self.f is None:
                     print('Error: failed to load data')
                     return False
-                if algorithm(self.f) is not None:
-                    return True
-                else:
-                    return False
+                return algorithm(self.f)
         else:
             # just trying this algorithm for a single slice
             iz = tryIndex
@@ -1940,19 +2118,15 @@ class leapctserver:
             print('Error: data_type must be ATTENUATION for reconstruction')
             return False
         
-        if self.projection_memory() >= self.max_CPU_memory_usage:
-            print('Error: insufficient memory!')
-            return False
-        
-        if self.g is None:
-            self.g = self.load_projections()
-            if self.g is None:
-                print('Error: failed to load data')
-                return False
-
-        if self.f is not None:
-            del self.f
         if self.projection_memory() + self.volume_memory() < self.max_CPU_memory_usage:
+            if self.g is None:
+                self.g = self.load_projections()
+                if self.g is None:
+                    print('Error: failed to load data')
+                    return False
+
+            if self.f is not None:
+                del self.f
             self.f = self.leapct.allocate_volume()
             if self.leapct.FBP(self.g, self.f) is not None:
                 if doClipping:
@@ -1968,6 +2142,15 @@ class leapctserver:
             else:
                 return False
         else:
+            # some bit of chunk needs to be performed
+            if self.projection_memory() >= self.max_CPU_memory_usage:
+                # not even enough memory to hold projections, so save data to disk just in case it is there
+                if self.g is not None:
+                    # save volume data first
+                    print('Saving projection data to disk...')
+                    self.save_projection_angles(self.g, update_params=True)
+                    self.clear_projection_data_data()
+        
             # chunking!
             output_file = os.path.join(self.outputDir, 'zslice.tif')
             output_full_path = os.path.join(self.path, output_file)
@@ -1999,7 +2182,14 @@ class leapctserver:
                 self.leapct_backup.set_offsetZ(self.leapct_backup.get_offsetZ() + z[sliceStart]-self.leapct_backup.get_z0())
                 rowRange = self.leapct_backup.rowRangeNeededForBackprojection()
 
-                g_chunk = self.leapct_backup.cropProjections(rowRange, None, self.g)
+                if self.g is not None:
+                    g_chunk = self.leapct_backup.cropProjections(rowRange, None, self.g)
+                else:
+                    g_chunk = self.load_projection_rows(self.projection_file, rowRange)
+                    if g_chunk is None:
+                        print('Error: failed to load projection data!')
+                        return False
+                    self.leapct_backup.cropProjections(rowRange, None)
                 
                 f_chunk = self.leapct_backup.FBP(g_chunk)
                 del g_chunk

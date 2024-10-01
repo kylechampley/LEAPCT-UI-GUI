@@ -20,7 +20,7 @@ mainWindow = mw.leapctrails(lctserver)
 #run(max_loop_level=2)
 
 """ Set Icon
-icon = QIcon(os.path.join(os.path.dirname(os.path.realpath(__file__)), "LEAPicon.png"))
+icon = QIcon(os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "LEAPicon_square.png"))
 application.setWindowIcon(icon)
 tray = QSystemTrayIcon()
 tray.setIcon(icon)
