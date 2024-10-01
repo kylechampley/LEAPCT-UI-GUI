@@ -1,5 +1,5 @@
 # LEAPCT-UI-GUI
-Beta version 0.1 has been released!
+Beta version 0.3 has been released!  Warning: until we release version 1.0, there will be bugs in this software.  Please be patient as we work through these.
 
 The purpose of this repo is to provide a high level UI and GUI for the [LEAP-CT](https://github.com/LLNL/LEAP/) and [XrayPhysics](https://github.com/kylechampley/XrayPhysics) libraries.
 
@@ -9,6 +9,10 @@ The UI part (leapctserver.py) is meant to help with
 3) Provide a higher level of automation for the LEAP algorithms which will limit their flexibility, but make them easier to use.
 
 The GUI, which we call LEAP-CT Rails, is built upon leapctserver.py using PyQt5 to assist in reconstructing real CT datasets.  I promised this GUI several months ago and I wanted to make good on this statement, but please be patient with this version.  There may be several bugs and things may not go as smoothly as you'd like.  Also note that this GUI currently only supports a small subset of the LEAP-CT features.
+
+<p align="center">
+  <img src=https://github.com/kylechampley/LEAPCT-UI-GUI/blob/main/screenshot.png>
+</p>
 
 This GUI is similar to the LTT GUI and future releases will add more features that are similar to the LTT GUI.  Some LTT GUI videos were posted to YouTube several years ago, so if you want to get a glimpse of where we are going with this GUI, see [here](https://www.youtube.com/watch?v=oVcFYh8oB4I).  You can also see [this](https://www.youtube.com/watch?v=VHt2kL85Ews) video for a demo of the XrayPhysics part of the GUI.
 
@@ -21,15 +25,16 @@ This GUI is similar to the LTT GUI and future releases will add more features th
 Although not required, we also recommend installing the [XrayPhysics](https://github.com/kylechampley/XrayPhysics) package.
 
 
-## Usage
-To launch the LEAP-CT GUI, do 
+## Installation and Usage
+To install the LEAP-CT GUI, do the following
 
 ```
 git clone https://github.com/kylechampley/LEAPCT-UI-GUI.git
 cd LEAPCT-UI-GUI
-python leapctrails/launch_leapctrails.py
+pip install .
 ```
 
+One should now find a clickable file to launch the GUI on their desktop.  For Windows this is a batch file and for Linux this is a shell script.  This file can be moved anywhere one wishes and it will still work.
 
 ## Future Releases
 
