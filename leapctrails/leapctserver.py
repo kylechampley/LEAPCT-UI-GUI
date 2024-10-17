@@ -103,6 +103,8 @@ class leapctserver:
         [self.UNSPECIFIED, self.RAW, self.RAW_DARK_SUBTRACTED, self.TRANSMISSION, self.ATTENUATION] = [0, 1, 2, 3, 4]
         self.data_type = self.UNSPECIFIED
 
+        # Output file name
+        self.outName = None
         
         ### Section II: data
         # Projection data (numpy array or torch tensor)
@@ -765,7 +767,9 @@ class leapctserver:
         return f
         
     def get_default_projection_file_name(self):
-        if self.data_type == self.RAW:
+        if self.outName is not None and len(self.outName) > 0:
+            return self.outName
+        elif self.data_type == self.RAW:
             return 'raw.tif'
         elif self.data_type == self.RAW_DARK_SUBTRACTED:
             return 'rawDarkSub.tif'
@@ -1267,12 +1271,11 @@ class leapctserver:
         if self.data_type == self.UNSPECIFIED:
             print('Error: must specify data_type')
             return None
-        elif self.g is None:
-            self.g = self.load_projections()
-        if self.g is None:
-            print('Error: failed to load data')
+        self.num_proj = 1
+        self.numOverlap = 0
+        if self.projection_processing_setup() == False:
             return None
-        else:
+        if self.g is not None:
             if self.data_type == self.ATTENUATION:
                 if has_torch == True and type(self.g) is torch.Tensor:
                     g_stack = torch.max(self.g,axis=0)
@@ -1284,7 +1287,47 @@ class leapctserver:
                 else:
                     g_stack = np.min(self.g,axis=0)
             return g_stack
+        else:
+            g_stack = None
+            if self.data_type == self.TRANSMISSION or self.data_type == self.ATTENUATION:
+                input_file = self.projection_file
+            else:
+                input_file = self.raw_scan_file
             
+            # Need to process the entire set of projections
+            numAngles = self.leapct.get_numAngles()
+            numChunks = int(np.ceil(float(numAngles)/float(self.chunk_size)))
+            for n in range(numChunks):
+                angleStart = n*self.chunk_size
+                angleEnd = min(numAngles-1, angleStart + self.chunk_size - 1)
+                
+                g_chunk = self.load_projection_angles(input_file, [angleStart, angleEnd])
+                if g_chunk is None:
+                    print('failed to load projections!')
+                    return False
+                
+                if self.data_type == self.ATTENUATION:
+                    if has_torch == True and type(self.g) is torch.Tensor:
+                        g_stack_cur = torch.max(g_chunk, axis=0)
+                    else:
+                        g_stack_cur = np.max(g_chunk, axis=0)
+                else:
+                    if has_torch == True and type(self.g) is torch.Tensor:
+                        g_stack_cur = torch.min(g_chunk, axis=0)
+                    else:
+                        g_stack_cur = np.min(g_chunk, axis=0)
+                
+                if g_stack is None:
+                    g_stack = g_stack_cur
+                else:
+                    if self.data_type == self.ATTENUATION:
+                        g_stack = self.leapct.maximum(g_stack, g_stack_cur)
+                    else:
+                        g_stack = self.leapct.minimum(g_stack, g_stack_cur)
+                
+                del g_chunk
+            
+            return g_stack
     
     def gain_correction(self, calibration_scans=None, ROI=None, badPixelFile=None):
         if self.leapct.ct_geometry_defined() == False:
@@ -1374,8 +1417,18 @@ class leapctserver:
                 print('Error: failed to load air scan file')
                 return False
             
-        func = lambda g: leap_preprocessing_algorithms.makeAttenuationRadiographs(self.leapct, g, air_scan, dark_scan, ROI)
+        algorithm = lambda g: leap_preprocessing_algorithms.makeAttenuationRadiographs(self.leapct, g, air_scan, dark_scan, ROI)
+        self.numOverlap = 0
+        self.num_proj = 1
+
+        self.outName = 'attenRad.tif'        
+        retVal = self.projection_processing(algorithm, tryIndex)
+        self.outName = None
+        if retVal:
+            self.data_type = self.ATTENUATION
+        return retVal
         
+        """
         if tryIndex is None:
         
             if self.g is None:
@@ -1387,7 +1440,7 @@ class leapctserver:
             if self.data_type == self.ATTENUATION:
                 self.leapct.expNeg(self.g)
             
-            if func(self.g) == True:
+            if algorithm(self.g) == True:
                 self.data_type = self.ATTENUATION
                 return True
             else:
@@ -1400,14 +1453,42 @@ class leapctserver:
             if self.data_type == self.ATTENUATION:
                 self.leapct.expNeg(aProj)
             
-            if func(aProj) == True:
+            if algorithm(aProj) == True:
                 self.lastImage = np.squeeze(aProj)
                 return True
             else:
                 self.lastImage = None
                 return False
+        #"""
                 
     def crop_projections(self, rowRange=None, colRange=None):
+    
+        if self.data_type != self.ATTENUATION:
+            print('Error: this algorithm currently only implemented for attenuation data')
+            return False
+        if rowRange is not None:
+            if rowRange[0] < 0 or rowRange[0] >= self.leapct.get_numRows() or rowRange[1] < 0 or rowRange[1] >= self.leapct.get_numRows() or rowRange[0] > rowRange[1]:
+                print('Error: invalid cropping region')
+                return False
+            numRows = rowRange[1] - rowRange[0] + 1
+        else:
+            numRows = self.leapct.get_numRows()
+        if colRange is not None:
+            if colRange[0] < 0 or colRange[0] >= self.leapct.get_numCols() or colRange[1] < 0 or colRange[1] >= self.leapct.get_numCols() or colRange[0] > colRange[1]:
+                print('Error: invalid cropping region')
+                return False
+            numCols = colRange[1] - colRange[0] + 1
+        else:
+            numCols = self.leapct.get_numCols()
+        self.chunking_type = self.PROJECTION
+        self.numOverlap = 0
+        self.num_vol = 0
+        self.num_proj = 1 + numRows*numCols / (self.get_numRows()*self.get_numCols())
+        algorithm = lambda g: self.leapct.crop_projections(rowRange, colRange, g)
+            
+        return self.projection_processing(algorithm, tryIndex)
+    
+        """
         if self.leapct.ct_geometry_defined() == False:
             print('Error: CT geometry not defined!')
             return False
@@ -1423,6 +1504,7 @@ class leapctserver:
         else:
             print('Error: crop projections current only implemented for attenuation data')
             return False
+        #"""
         
     def badPixelCorrection(self, badPixelFile=None, windowSize=5):
         if self.leapct.ct_geometry_defined() == False:
@@ -1515,10 +1597,29 @@ class leapctserver:
         if self.leapct.ct_geometry_defined() == False:
             print('Error: CT geometry not defined!')
             return False
-        if self.projection_memory() >= self.max_CPU_memory_usage:
-            print('Error: not enough memory for this operation!')
+        if self.data_type != self.ATTENUATION:
+            print('Error: find_centerCol current only implemented for attenuation data')
             return False
-        if self.data_type == self.ATTENUATION:
+        
+        if self.g is None and self.projection_memory() >= self.max_CPU_memory_usage:
+            if iRow < 0 or iRow >= self.leapct.get_numRows():
+                if self.leapct.get_geometry() == 'CONE' or self.leapct.get_geometry() == 'CONE-PARALLEL':
+                    iRow = int(np.floor(0.5 + self.leapct.get_centerRow()))
+                else:
+                    iRow = self.leapct.get_numRows()//2
+            rowRange = [iRow, iRow]
+            g_chunk = self.load_projection_rows(self.projection_file, rowRange)
+            if g_chunk is None:
+                print('Error: failed to load data!')
+                return False
+            self.leapct_backup.copy_parameters(self.leapct)
+            self.leapct.crop_rows(rowRange)
+            self.leapct.find_centerCol(g_chunk)
+            centerCol = self.leapct.get_centerCol()
+            self.leapct.copy_parameters(self.leapct_backup)
+            self.leapct.set_centerCol(centerCol)
+            return True
+        else:
             if self.g is None:
                 self.g = self.load_projections()
                 if self.g is None:
@@ -1526,9 +1627,6 @@ class leapctserver:
                     return False
             self.leapct.find_centerCol(self.g, iRow)
             return True
-        else:
-            print('Error: find_centerCol current only implemented for attenuation data')
-            return False
             
     def conjugate_difference(self, alpha=0.0, centerCol=None):
         if self.leapct.ct_geometry_defined() == False:
@@ -1726,6 +1824,8 @@ class leapctserver:
         self.num_proj = max(1, self.num_proj)
         self.numOverlap = max(0, self.numOverlap)
         
+        self.chunk_size = self.leapct.get_numAngles()
+        
         if tryIndex is None:
             # Need to process the entire set of projections
             if self.num_proj*self.projection_memory() >= self.max_CPU_memory_usage:
@@ -1785,8 +1885,10 @@ class leapctserver:
                     if g_chunk is None:
                         print('failed to load projections!')
                         return False
-                        
+                    
+                    self.leapct_backup.copy_parameters(self.leapct)
                     if algorithm(g_chunk) == False:
+                        self.leapct.copy_parameters(self.leapct_backup)
                         return False
                     
                     if n == numChunks-1:
@@ -1797,6 +1899,8 @@ class leapctserver:
                     self.save_projection_angles(g_chunk, angleStart, update_params=update_params)
                     if update_params:
                         self.save_parameters()
+                    else:
+                        self.leapct.copy_parameters(self.leapct_backup)
                     del g_chunk
                 
                 return True
@@ -1815,7 +1919,9 @@ class leapctserver:
             if aProj is None:
                 print('Error: failed to load data')
                 return False
+            self.leapct_backup.copy_parameters(self.leapct)
             algorithm(aProj)
+            self.leapct.copy_parameters(self.leapct_backup)
             self.lastImage = np.squeeze(aProj)
             
             return True
@@ -1832,6 +1938,8 @@ class leapctserver:
         self.num_vol = 0
         self.num_proj = max(1, self.num_proj)
         self.numOverlap = max(0, self.numOverlap)
+        
+        self.chunk_size = self.leapct.get_numRows()
         
         if tryIndex is None:
             # Need to process all detector rows
@@ -1963,6 +2071,8 @@ class leapctserver:
         self.num_proj = 0
         self.num_vol = max(1, self.num_vol)
         self.numOverlap = max(0, self.numOverlap)
+        
+        self.chunk_size = self.leapct.get_numZ()
         
         if tryIndex is None:
             # Need to process the whole volume
@@ -3306,7 +3416,10 @@ class leapctserver:
         fdes = open(fileName, 'r')
         Lines = fdes.readlines()
         for line in Lines:
-            if "=" in line:
+            line = line.lstrip()
+            if line[0] == '#':
+                pass
+            elif "=" in line:
                 #print(line)
                 self.set_cmd(line, False)
             else:
