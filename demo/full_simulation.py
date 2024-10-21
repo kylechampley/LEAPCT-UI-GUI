@@ -23,12 +23,12 @@ dark_file = os.path.join(dataPath, 'dark.tif')
 numCols = 512
 numAngles = 2*2*int(360*numCols/1024)
 pixelSize = 0.65*512/numCols
-numRows = 32
+numRows = 64
 leapct.set_conebeam(numAngles, numRows, numCols, pixelSize, pixelSize, 0.5*(numRows-1), 0.5*(numCols-1)+10, leapct.setAngleArray(numAngles, 360.0), 1100, 1400)
 
 # Set the volume parameters
 leapct.set_default_volume()
-leapct.set_numZ(numRows+4)
+leapct.set_numZ(numRows+8)
 
 leapct.save_parameters(os.path.join(dataPath, 'geometry.txt'))
 
@@ -42,7 +42,7 @@ leapct.project(g,f)
 kV = 160.0
 takeOffAngle = 11.0
 Es, s = physics.simulateSpectra(kV,takeOffAngle)
-detResp = physics.detectorResponse('O2SGd2', 7.32e-3, 0.1, Es)
+detResp = physics.detectorResponse('GOS', None, 0.1, Es)
 s_total = s#*detResp #*filtResp
 
 # Apply Beam Hardening
