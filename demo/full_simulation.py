@@ -30,8 +30,6 @@ leapct.set_conebeam(numAngles, numRows, numCols, pixelSize, pixelSize, 0.5*(numR
 leapct.set_default_volume()
 leapct.set_numZ(numRows+8)
 
-leapct.save_parameters(os.path.join(dataPath, 'geometry.txt'))
-
 # "Simulate" projection data
 g = leapct.allocate_projections()
 f = leapct.allocate_volume()
@@ -76,6 +74,7 @@ t += dark_scan
 air_scan += dark_scan
 
 leapct.set_default_volume()
+leapct.save_parameters(os.path.join(dataPath, 'geometry.txt'))
 leapct.save_projections(raw_file, t)
 imageio.imwrite(air_file, air_scan)
 imageio.imwrite(dark_file, dark_scan)
