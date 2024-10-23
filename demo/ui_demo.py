@@ -1,4 +1,5 @@
 import os
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 from leapctserver import leapctserver
@@ -21,11 +22,16 @@ lctserver.set_raw_data_files('raw.tif', 'air.tif', 'dark.tif')
 lctserver.geometry_file = 'geometry.txt'
 lctserver.load_geometry_file()
 lctserver.set_source_spectra(160.0)
-
+lctserver.set_detector_response('GOS', None, 0.1)
+lctserver.reference_energy = 63.9544
+lctserver.set_object_model('water')
+lctserver.save_parameters()
+#quit()
 
 ###############################################################################
 # Run preprocessing algorithms
 ###############################################################################
+startTime = time.time()
 
 # First we convert the raw data to attenuation data (line integrals)
 # This includes subtracting off the dark current, dividing by the air scan, and taking the negative log
@@ -45,7 +51,7 @@ lctserver.ringRemoval()
 
 # Finally we perform single material beam hardening correction (BHC).  This is optional and requires a spectral model.
 # LEAP also has multi-material BHC algorithms.
-lctserver.singleMaterialBHC('water')
+lctserver.singleMaterialBHC()
 #lctserver.leapct.display(lctserver.g)
 
 ###############################################################################
@@ -54,14 +60,20 @@ lctserver.singleMaterialBHC('water')
 # 1) Run the automated find_centerCol routine
 # 2) Perform a series of reconstructions with values of centerCol around the estimated value to allow the user to estimate the best value
 lctserver.leapct.find_centerCol(lctserver.g)
+elapsedTime = time.time() - startTime
 lctserver.leapct.display(lctserver.parameter_sweep(np.array(range(9))-4.0+lctserver.leapct.get_centerCol()))
 centerCol = input("Enter the estimate for centerCol: ")
 lctserver.leapct.set_centerCol(float(centerCol))
 
 
-# Reconstruct and display result
+# Reconstruct
+startTime = time.time()
 lctserver.FBP()
+print('Total processing time: ' + str(time.time()-startTime+elapsedTime))
 lctserver.f[lctserver.f<0.0] = 0.0
+
+
+# Display result
 plt.imshow(np.squeeze(lctserver.f[lctserver.f.shape[0]//2,:,:]), cmap='gray')
 plt.show()
 #lctserver.leapct.display(lctserver.f)
