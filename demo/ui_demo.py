@@ -2,7 +2,7 @@ import os
 import time
 import numpy as np
 import matplotlib.pyplot as plt
-from leapctserver import leapctserver
+from leapctrails.leapctserver import leapctserver
 
 # Set the path and create an leapctserver object
 path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'sample_data')

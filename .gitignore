@@ -5,6 +5,7 @@ test_ART_save.py
 *.dat
 *.raw
 *.sct
+demo/sample_data/leapct_*
 demo/sample_data/*.tif
 demo/sample_data/*.txt
 LTT.log

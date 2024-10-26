@@ -1424,7 +1424,7 @@ class leapctserver:
         self.outName = 'attenRad.tif'        
         retVal = self.projection_processing(algorithm, tryIndex)
         self.outName = None
-        if retVal:
+        if retVal and tryIndex is None:
             self.data_type = self.ATTENUATION
         return retVal
         
@@ -1920,7 +1920,9 @@ class leapctserver:
                 print('Error: failed to load data')
                 return False
             self.leapct_backup.copy_parameters(self.leapct)
+            data_type_save = self.data_type
             algorithm(aProj)
+            self.data_type = data_type_save
             self.leapct.copy_parameters(self.leapct_backup)
             self.lastImage = np.squeeze(aProj)
             
