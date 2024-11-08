@@ -145,6 +145,7 @@ class leapctserver:
         self.energy_bin_width = -1.0
         self.kV = None
         self.takeoff_angle = 11.0
+        self.anode_normal = None #np.array([0.0, 1.0, 0.0], dtype=np.float32)
         self.anode_material = 74
         self.xray_filters = None
         self.detector_response_model = None
@@ -224,6 +225,8 @@ class leapctserver:
             print('kV = ', self.kV)
             print('anode_material = ', self.anode_material)
             print('takeoff_angle = ', self.takeoff_angle)
+            if self.anode_normal is not None:
+                print('anode_normal = ', self.anode_normal)
         if self.xray_filters is not None:
             print('xray_filters = ', self.xray_filters)
         if self.detector_response_model is not None:
@@ -546,6 +549,8 @@ class leapctserver:
             f.write('kV = ' + str(self.kV) + '\n')
             f.write('anode_material = ' + str(self.anode_material) + '\n')
             f.write('takeoff_angle = ' + str(self.takeoff_angle) + '\n')
+            if self.anode_normal is not None:
+                f.write('anode_normal = ' + str(self.anode_normal) + '\n')
         if self.xray_filters is not None:
             f.write('xray_filters = ' + str(self.xray_filters) + '\n')
         if self.detector_response_model is not None:
@@ -2648,6 +2653,8 @@ class leapctserver:
                 self.kV = -1.0
             case "takeOffAngle":
                 self.takeoff_angle = 11.0
+            case "anodeNormal":
+                self.anode_normal = None # np.array([0.0, 1.0, 0.0], dtype=np.float32)
             case "anodeMaterial":
                 self.anode_material = 74
             case "filterMaterials":
@@ -2813,6 +2820,8 @@ class leapctserver:
                 self.kV = float(value)
             case "takeOffAngle" | "takeoff_angle":
                 self.takeoff_angle = float(value)
+            case "anode_normal" | "anodeNormal":
+                self.anode_normal = eval(value)
             case "anodeMaterial" | "anode_material":
                 self.anode_material = int(value)
             case "filterMaterials" | "xray_filters":
@@ -3028,6 +3037,11 @@ class leapctserver:
                 return str(self.kV)
             case "takeOffAngle":
                 return str(self.takeoff_angle)
+            case "anode_normal":
+                if self.anode_normal is not None:
+                    return str(self.anode_normal)
+                else:
+                    return ""
             case "anodeMaterial":
                 return str(self.anode_material)
             case "filterMaterials":
@@ -3272,6 +3286,11 @@ class leapctserver:
                     return True
             case "takeOffAngle":
                 if self.takeoff_angle > 0.0:
+                    return False
+                else:
+                    return True
+            case "anode_normal":
+                if self.anode_normal is not None:
                     return False
                 else:
                     return True
